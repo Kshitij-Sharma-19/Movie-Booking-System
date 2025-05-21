@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Rename resource &apos;config-server/src/main/resources/config/movie-catlog-service.properties&apos; to &apos;movie-catalog-service.properties&apos;" description="Rename resource &apos;movie-catlog-service.properties&apos;" flags="7" id="org.eclipse.ltk.core.refactoring.rename.resource" input="src/main/resources/config/movie-catlog-service.properties" name="movie-catalog-service.properties" stamp="1746531106857" updateReferences="true"/>
+</session>

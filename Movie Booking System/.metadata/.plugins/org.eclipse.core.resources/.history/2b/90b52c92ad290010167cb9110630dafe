@@ -1,0 +1,5 @@
+package com.movie.userservice.model;
+
+public class UserProfile {
+
+}

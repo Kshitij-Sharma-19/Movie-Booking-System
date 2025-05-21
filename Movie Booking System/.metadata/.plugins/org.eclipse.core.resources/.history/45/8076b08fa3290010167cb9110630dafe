@@ -1,0 +1,5 @@
+package com.movie.booking.model;
+
+public enum BookingStatus {
+
+}

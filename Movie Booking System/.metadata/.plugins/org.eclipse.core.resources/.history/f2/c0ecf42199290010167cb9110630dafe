@@ -1,0 +1,5 @@
+package com.movie.gateway.config;
+
+public class SecurityConfig {
+
+}

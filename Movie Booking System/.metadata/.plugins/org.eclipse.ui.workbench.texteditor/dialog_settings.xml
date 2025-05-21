@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<section name="Workbench">
+	<item key="hasShownOverlayPopupBefore" value="true"/>
+	<section name="java.lang.Class">
+		<item key="replaceBarOpen" value="false"/>
+		<list key="findhistory">
+			<item value="inc"/>
+			<item value="sea"/>
+			<item value="private ShowtimeDto convertToDto"/>
+			<item value="convertToDto"/>
+			<item value="spring-boot-starter-data-jpa"/>
+			<item value="connector"/>
+			<item value="nimbus"/>
+			<item value="bootstr"/>
+			<item value="bootstra"/>
+			<item value="gateway"/>
+			<item value="bootstrap"/>
+		</list>
+	</section>
+</section>

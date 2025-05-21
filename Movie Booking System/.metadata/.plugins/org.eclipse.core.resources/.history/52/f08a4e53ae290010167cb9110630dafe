@@ -1,0 +1,5 @@
+package com.movie.userservice.config;
+
+public class SecurityConfig {
+
+}

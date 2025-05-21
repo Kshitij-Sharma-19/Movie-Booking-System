@@ -1,0 +1,5 @@
+package com.movie.userservice.controller;
+
+public class UserProfileController {
+
+}

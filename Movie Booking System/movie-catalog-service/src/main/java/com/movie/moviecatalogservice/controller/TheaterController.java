@@ -1,0 +1,89 @@
+package com.movie.moviecatalogservice.controller;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import com.movie.moviecatalogservice.dto.TheaterDto;
+import com.movie.moviecatalogservice.service.TheaterService;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/v1/theaters")
+@RequiredArgsConstructor
+@Tag(name = "Theater Management", description = "APIs for managing theaters")
+public class TheaterController {
+
+    private final TheaterService theaterService;
+
+    @GetMapping
+    @Operation(summary = "Get all theaters", description = "Retrieves a list of all theaters, optionally filtered by city.")
+    @ApiResponse(responseCode = "200", description = "Successfully retrieved list")
+    public ResponseEntity<List<TheaterDto>> getAllTheaters(
+            @Parameter(description = "Filter theaters by city (optional)") @RequestParam(required = false) String city) {
+         if (city != null && !city.isEmpty()) {
+            return ResponseEntity.ok(theaterService.getTheatersByCity(city));
+        }
+        return ResponseEntity.ok(theaterService.getAllTheaters());
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Get theater by ID", description = "Retrieves a specific theater by its ID.")
+    @ApiResponse(responseCode = "200", description = "Successfully retrieved theater")
+    @ApiResponse(responseCode = "404", description = "Theater not found")
+    public ResponseEntity<TheaterDto> getTheaterById(
+            @Parameter(description = "ID of the theater to retrieve") @PathVariable Long id) {
+        return ResponseEntity.ok(theaterService.getTheaterById(id));
+    }
+
+    @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Add a new theater", description = "Adds a new theater. Requires ADMIN role.",
+               security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponse(responseCode = "201", description = "Theater created successfully")
+    @ApiResponse(responseCode = "400", description = "Invalid input")
+    @ApiResponse(responseCode = "401", description = "Unauthorized")
+    @ApiResponse(responseCode = "403", description = "Forbidden")
+    public ResponseEntity<TheaterDto> addTheater(@Valid @RequestBody TheaterDto theaterDto) {
+        TheaterDto createdTheater = theaterService.addTheater(theaterDto);
+        return new ResponseEntity<>(createdTheater, HttpStatus.CREATED);
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Update an existing theater", description = "Updates details of an existing theater by ID. Requires ADMIN role.",
+               security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponse(responseCode = "200", description = "Theater updated successfully")
+    @ApiResponse(responseCode = "400", description = "Invalid input")
+    @ApiResponse(responseCode = "404", description = "Theater not found")
+    @ApiResponse(responseCode = "401", description = "Unauthorized")
+    @ApiResponse(responseCode = "403", description = "Forbidden")
+    public ResponseEntity<TheaterDto> updateTheater(
+            @Parameter(description = "ID of the theater to update") @PathVariable Long id,
+            @Valid @RequestBody TheaterDto theaterDto) {
+        return ResponseEntity.ok(theaterService.updateTheater(id, theaterDto));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Delete a theater", description = "Deletes a theater by ID. Requires ADMIN role.",
+               security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponse(responseCode = "204", description = "Theater deleted successfully")
+    @ApiResponse(responseCode = "404", description = "Theater not found")
+    @ApiResponse(responseCode = "401", description = "Unauthorized")
+    @ApiResponse(responseCode = "403", description = "Forbidden")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteTheater(
+            @Parameter(description = "ID of the theater to delete") @PathVariable Long id) {
+        theaterService.deleteTheater(id);
+    }
+}

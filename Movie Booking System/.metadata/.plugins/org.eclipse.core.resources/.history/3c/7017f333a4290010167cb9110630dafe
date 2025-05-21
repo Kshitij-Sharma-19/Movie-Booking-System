@@ -1,0 +1,5 @@
+package com.movie.booking.repository;
+
+public class BookingRepository {
+
+}

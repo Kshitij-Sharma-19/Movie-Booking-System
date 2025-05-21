@@ -1,0 +1,5 @@
+package com.movie.booking.config;
+
+public class OpenApiConfig {
+
+}

@@ -1,0 +1,22 @@
+package com.movie.booking.repository;
+
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import com.movie.booking.model.Booking;
+
+@Repository
+public interface BookingRepository extends JpaRepository<Booking, Long> {
+
+    // Find bookings by user ID, ordered by booking time descending
+    List<Booking> findByUserIdOrderByBookingTimeDesc(String userId);
+
+    // Find a specific booking by ID and user ID (for ownership check)
+    Optional<Booking> findByIdAndUserId(Long id, String userId);
+
+    // Find bookings by status (e.g., find pending payments)
+    List<Booking> findByStatus(BookingStatus status);
+}

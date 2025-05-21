@@ -1,0 +1,15 @@
+package com.movie.booking.config;
+
+import feign.RequestInterceptor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class FeignClientConfiguration {
+
+    @Bean
+    public RequestInterceptor userFeignClientInterceptor() {
+        // This ensures the same interceptor instance is used, or you can create a new one
+        return new UserFeignClientInterceptor(); 
+    }
+}
