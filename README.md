@@ -1,1 +1,1 @@
-# SpringBoot Based Movie Booking System (Backend)
+# Spring Boot Based Movie Booking System (Backend)
