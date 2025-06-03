@@ -46,6 +46,11 @@ public interface PaymentClient {
              // throw new MovieCatalogClient.ServiceUnavailableException("Payment Service unavailable (processPayment)");
         }
 
-         // TODO: Implement fallback for refund
+
+        public static class ServiceUnavailableException extends RuntimeException {
+            public ServiceUnavailableException(String message) {
+                super(message);
+            }
+        }
     }
 }

@@ -2,6 +2,7 @@ package com.movie.moviecatalogservice.model;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Future;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
@@ -48,6 +49,7 @@ public class Showtime {
     @Column(nullable = false)
     private Integer availableSeats; // Simple tracking, could be more complex
 
-    // Consider adding screen number if a theater has multiple screens
-    // private String screenNumber;
+    @NotBlank(message = "Screen number cannot be blank")
+    @Column(nullable = false)
+    private String screenNumber; 
 }

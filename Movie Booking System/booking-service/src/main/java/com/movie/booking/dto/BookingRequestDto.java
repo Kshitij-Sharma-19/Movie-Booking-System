@@ -1,5 +1,8 @@
 package com.movie.booking.dto;
 
+import java.util.List;
+
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
@@ -20,5 +23,7 @@ public class BookingRequestDto {
     @Positive(message = "Number of seats must be positive")
     private Integer numberOfSeats;
 
+    @NotEmpty(message = "Selected seats cannot be empty")
+    private List<String> selectedSeats; // ADDED: e.g., ["A1", "A2"]
     // userId will be extracted from the JWT token in the controller/service
 }

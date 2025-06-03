@@ -1,6 +1,7 @@
 package com.movie.moviecatalogservice.dto;
 
 import jakarta.validation.constraints.Future;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
@@ -34,6 +35,9 @@ public class ShowtimeDto {
 
     @Positive(message = "Available seats must be positive or zero")
     private Integer availableSeats;
+    
+    @NotBlank(message = "Screen number cannot be blank")
+    private String screenNumber;
 
     // Optionally include nested MovieDto/TheaterDto in response
     private MovieDto movie;

@@ -1,0 +1,43 @@
+package com.movie.moviecatalogservice.client;
+
+import com.movie.moviecatalogservice.dto.SeatInitRequestDto;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Component;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import lombok.extern.slf4j.Slf4j;
+
+// "booking-service" should match the spring.application.name of your booking service
+// or provide a direct URL: @FeignClient(name = "booking-service", url = "${booking.service.url}")
+@FeignClient(name = "booking-service", fallback = BookingServiceClient.BookingServiceFallback.class,
+url = "http://localhost:8083")
+public interface BookingServiceClient {
+
+    @PostMapping("/api/v1/admin/showtimes/{showtimeId}/initialize-seats")
+    @CircuitBreaker(name = "booking-service") // Resilience4j circuit breaker
+    @Retry(name = "booking-service")          // Resilience4j retry
+    ResponseEntity<String> initializeSeatsForShowtime(
+            @PathVariable("showtimeId") Long showtimeId,
+            @RequestBody SeatInitRequestDto requestDto);
+
+    // Fallback implementation
+    @Component
+    @Slf4j
+    class BookingServiceFallback implements BookingServiceClient {
+        @Override
+        public ResponseEntity<String> initializeSeatsForShowtime(Long showtimeId, SeatInitRequestDto requestDto) {
+            log.error("Fallback: BookingService.initializeSeatsForShowtime call failed for showtimeId: {}", showtimeId);
+            // Depending on requirements, you might:
+            // 1. Return an error response (which the caller needs to handle)
+            // 2. Throw an exception (caller needs to catch)
+            // 3. Enqueue a message for later processing (more complex)
+            // For now, let's return a 503 Service Unavailable, indicating the operation should be retried later or handled manually.
+            // The calling service (ShowtimeService) should be aware of this potential failure.
+            return ResponseEntity.status(503).body("Booking service unavailable, seat initialization failed for showtime " + showtimeId);
+        }
+    }
+}

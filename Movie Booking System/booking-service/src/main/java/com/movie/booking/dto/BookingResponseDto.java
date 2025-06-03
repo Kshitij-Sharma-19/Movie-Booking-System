@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List; // Import List
 
 import com.movie.booking.model.BookingStatus;
 
@@ -20,7 +21,8 @@ public class BookingResponseDto {
     private Long showtimeId;
     private Long movieId;
     private Long theaterId;
-    private Integer numberOfSeats;
+    private Integer numberOfSeats; // Derived from selectedSeats.size()
+    private List<String> selectedSeats; // ADDED FIELD
     private BigDecimal totalPrice;
     private LocalDateTime bookingTime;
     private BookingStatus status;

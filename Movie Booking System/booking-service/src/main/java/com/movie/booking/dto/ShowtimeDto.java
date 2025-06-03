@@ -20,12 +20,25 @@ public class ShowtimeDto {
     private Long theaterId;
     private LocalDateTime showtime;
     private BigDecimal price;
-    private Integer availableSeats;
+    private Integer availableSeats; // This will represent approximate/overall availability
+                                  // True seat-level availability is managed by BookingService's ShowtimeSeat
+
     // Include nested Movie/Theater info if needed for denormalization
     private MovieDto movie;
     private TheaterDto theater;
 
-    // Nested DTOs (can be simplified further if only names/titles are needed)
-    @Data @NoArgsConstructor @AllArgsConstructor @Builder public static class MovieDto { private Long id; private String title; }
-    @Data @NoArgsConstructor @AllArgsConstructor @Builder public static class TheaterDto { private Long id; private String name; }
+    // Nested DTOs
+    @Data @NoArgsConstructor @AllArgsConstructor @Builder
+    public static class MovieDto {
+        private Long id;
+        private String title;
+    }
+
+    @Data @NoArgsConstructor @AllArgsConstructor @Builder
+    public static class TheaterDto {
+        private Long id;
+        private String name;
+        private Integer capacity;     // ADDED: Total seating capacity of this theater/screen
+        private Integer seatsPerRow;  // ADDED: Configuration for layout, e.g., 10 seats per row
+    }
 }

@@ -1,31 +1,34 @@
 package com.movie.booking.service;
 
-import feign.FeignException;
-import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import com.movie.booking.client.MovieCatalogClient;
 import com.movie.booking.client.PaymentClient;
-import com.movie.booking.dto.BookingRequestDto;
-import com.movie.booking.dto.BookingResponseDto;
-import com.movie.booking.dto.PaymentRequestDto;
-import com.movie.booking.dto.PaymentResponseDto;
-import com.movie.booking.dto.ShowtimeDto;
+import com.movie.booking.dto.*;
 import com.movie.booking.exception.BookingException;
 import com.movie.booking.exception.ResourceNotFoundException;
 import com.movie.booking.model.Booking;
 import com.movie.booking.model.BookingStatus;
+import com.movie.booking.model.SeatStatus;
+import com.movie.booking.model.ShowtimeSeat;
 import com.movie.booking.repository.BookingRepository;
+import com.movie.booking.repository.ShowtimeSeatRepository;
+
+import feign.FeignException;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import jakarta.persistence.OptimisticLockException;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
-
 
 @Service
 @RequiredArgsConstructor
@@ -33,95 +36,333 @@ import java.util.stream.Collectors;
 public class BookingService {
 
     private final BookingRepository bookingRepository;
+    private final ShowtimeSeatRepository showtimeSeatRepository;
     private final MovieCatalogClient movieCatalogClient;
-    private final PaymentClient paymentClient; // Assuming PaymentClient exists
+    private final PaymentClient paymentClient;
 
-    // --- Mapping Logic ---
-     private BookingResponseDto convertToDto(Booking booking) {
-        return BookingResponseDto.builder()
-                .id(booking.getId())
-                .userId(booking.getUserId())
-                .showtimeId(booking.getShowtimeId())
-                .movieId(booking.getMovieId())
-                .theaterId(booking.getTheaterId())
-                .numberOfSeats(booking.getNumberOfSeats())
-                .totalPrice(booking.getTotalPrice())
-                .bookingTime(booking.getBookingTime())
-                .status(booking.getStatus())
-                .paymentTransactionId(booking.getPaymentTransactionId())
-                .movieTitle(booking.getMovieTitle()) // Use denormalized data
-                .theaterName(booking.getTheaterName())
-                .showtimeDateTime(booking.getShowtimeDateTime())
-                .build();
-    }
-    // --- End Mapping Logic ---
+    private static final int SEAT_LOCK_DURATION_MINUTES = 10;
+    private static final int DEFAULT_SEATS_PER_ROW = 10;
+    private static final int MAX_ROWS = 26; // A-Z
+    private static final int MAX_SEATS_PER_ROW_FOR_ALPHANUMERIC = 10; // Your fixed A1-A10 rule
+    private static final int ABSOLUTE_MAX_SEATS = MAX_ROWS * MAX_SEATS_PER_ROW_FOR_ALPHANUMERIC; // 260
 
-    @Transactional // Make booking creation transactional
-    public BookingResponseDto createBooking(BookingRequestDto request, String userId) {
-        log.info("Attempting to create booking for user: {}, showtime: {}", userId, request.getShowtimeId());
+    /**
+     * Initializes seat records for a given showtime if they don't already exist.
+     * This method is idempotent. Seats are named A1-A10, B1-B10, ..., up to Z1-Z10.
+     * Max seats generated is 260.
+     *
+     * @param showtimeId     The ID of the showtime.
+     * @param requestDto     DTO containing totalSeats and optionally seatsPerRow.
+     */
+    @Transactional
+    public String initializeSeatsForShowtime(Long showtimeId, SeatInitRequestDto requestDto) {
+        log.info("Attempting to initialize seats for showtimeId: {} with requested totalSeats: {}, requested seatsPerRow: {}",
+                showtimeId, requestDto.getTotalSeats(), requestDto.getSeatsPerRow());
 
-        // 1. Get Showtime Details from Movie Catalog Service
-        ShowtimeDto showtimeDto = getShowtimeDetails(request.getShowtimeId());
-
-        // 2. Validate Showtime and Availability
-        validateShowtime(showtimeDto, request.getNumberOfSeats());
-
-        // 3. Create Initial Booking Record (Status: PENDING_PAYMENT)
-        BigDecimal totalPrice = showtimeDto.getPrice().multiply(BigDecimal.valueOf(request.getNumberOfSeats()));
-        Booking booking = Booking.builder()
-                .userId(userId)
-                .showtimeId(request.getShowtimeId())
-                .movieId(showtimeDto.getMovie().getId()) // Denormalize
-                .theaterId(showtimeDto.getTheater().getId()) // Denormalize
-                .numberOfSeats(request.getNumberOfSeats())
-                .totalPrice(totalPrice)
-                .bookingTime(LocalDateTime.now())
-                .status(BookingStatus.PENDING_PAYMENT)
-                .movieTitle(showtimeDto.getMovie().getTitle()) // Denormalize
-                .theaterName(showtimeDto.getTheater().getName()) // Denormalize
-                .showtimeDateTime(showtimeDto.getShowtime()) // Denormalize
-                .build();
-        booking = bookingRepository.save(booking);
-        log.info("Initial booking record created with id: {}, status: PENDING_PAYMENT", booking.getId());
-
-
-        // 4. Process Payment
-        PaymentResponseDto paymentResponse = processPayment(booking);
-
-        // 5. Handle Payment Response & Update Seats/Booking Status
-        if (paymentResponse.getStatus() == PaymentResponseDto.PaymentStatus.SUCCEEDED) {
-            log.info("Payment successful for booking id: {}. Transaction ID: {}", booking.getId(), paymentResponse.getTransactionId());
-            // Try to decrease seats in movie catalog
-            boolean seatsDecreased = decreaseSeatsInCatalog(booking.getShowtimeId(), booking.getNumberOfSeats());
-
-            if (seatsDecreased) {
-                // Payment succeeded AND seats decreased -> Confirm Booking
-                booking.setStatus(BookingStatus.CONFIRMED);
-                booking.setPaymentTransactionId(paymentResponse.getTransactionId());
-                log.info("Booking confirmed for id: {}", booking.getId());
-            } else {
-                // Payment succeeded BUT seats could NOT be decreased -> Critical Failure!
-                // Need compensation: Refund payment
-                log.error("CRITICAL: Payment succeeded but failed to decrease seats for booking id: {}. Initiating refund.", booking.getId());
-                // TODO: Implement refund logic via PaymentClient
-                // paymentClient.refundPayment(...)
-                booking.setStatus(BookingStatus.PAYMENT_FAILED); // Or a specific error status
-                booking.setPaymentTransactionId(paymentResponse.getTransactionId()); // Store transaction ID even if refund needed
-                // Throw exception to indicate booking failure despite payment
-                 throw new BookingException("Booking failed: Could not reserve seats after successful payment. Payment will be refunded.", booking.getId());
-            }
-        } else {
-            // Payment failed
-            log.warn("Payment failed for booking id: {}. Reason: {}", booking.getId(), paymentResponse.getMessage());
-            booking.setStatus(BookingStatus.PAYMENT_FAILED);
-            // No need to decrease seats
+        if (showtimeId == null || requestDto == null || requestDto.getTotalSeats() == null || requestDto.getTotalSeats() <= 0) {
+            String errorMsg = String.format("Invalid input for seat initialization. ShowtimeId: %s, Requested TotalSeats: %s, Requested SeatsPerRow: %s",
+                                            showtimeId, requestDto != null ? requestDto.getTotalSeats() : "null", requestDto != null ? requestDto.getSeatsPerRow() : "null");
+            log.warn(errorMsg);
+            throw new IllegalArgumentException(errorMsg);
         }
 
-        // Save final booking state
-        Booking finalBooking = bookingRepository.save(booking);
-        return convertToDto(finalBooking);
+        int requestedTotalSeats = requestDto.getTotalSeats();
+        // For A1-Z10 scheme, seatsPerRow is fixed at 10.
+        // The input requestDto.seatsPerRow will be ignored if it's different from 10 for this scheme.
+        int seatsPerRow = MAX_SEATS_PER_ROW_FOR_ALPHANUMERIC; 
+
+        if (requestDto.getSeatsPerRow() != null && requestDto.getSeatsPerRow() != seatsPerRow) {
+            log.warn("Requested seatsPerRow ({}) for showtimeId {} is different from the fixed {} seats/row for A1-Z10 scheme. Using {} seats/row.",
+                     requestDto.getSeatsPerRow(), showtimeId, seatsPerRow, seatsPerRow);
+        }
+        
+        // Cap the number of seats to be created at ABSOLUTE_MAX_SEATS (260)
+        int actualTotalSeatsToCreate = Math.min(requestedTotalSeats, ABSOLUTE_MAX_SEATS);
+        if (requestedTotalSeats > ABSOLUTE_MAX_SEATS) {
+            log.warn("Requested totalSeats ({}) for showtimeId {} exceeds the maximum of {}. Capping at {}.",
+                     requestedTotalSeats, showtimeId, ABSOLUTE_MAX_SEATS, actualTotalSeatsToCreate);
+        }
+
+        long deletedCount = showtimeSeatRepository.deleteByShowtimeId(showtimeId);
+        if (deletedCount > 0) {
+            log.info("Deleted {} existing seat(s) for showtimeId {} before re-initialization.", deletedCount, showtimeId);
+        }
+
+        List<ShowtimeSeat> seatsToCreate = new ArrayList<>();
+        int seatsCreatedCount = 0;
+
+        for (int rowIndex = 0; rowIndex < MAX_ROWS; rowIndex++) {
+            if (seatsCreatedCount >= actualTotalSeatsToCreate) {
+                break; // Stop if we've reached the capped total number of seats
+            }
+            char currentRowChar = (char) ('A' + rowIndex); // A, B, C, ...
+
+            for (int seatNumInRow = 1; seatNumInRow <= seatsPerRow; seatNumInRow++) {
+                if (seatsCreatedCount >= actualTotalSeatsToCreate) {
+                    break; // Stop if we've reached the capped total
+                }
+
+                String seatIdentifier = String.format("%c%d", currentRowChar, seatNumInRow);
+
+                ShowtimeSeat seat = ShowtimeSeat.builder()
+                        .showtimeId(showtimeId)
+                        .seatIdentifier(seatIdentifier)
+                        .status(SeatStatus.AVAILABLE)
+                        .version(0L)
+                        .build();
+                seatsToCreate.add(seat);
+                seatsCreatedCount++;
+            }
+        }
+
+        if (!seatsToCreate.isEmpty()) {
+            showtimeSeatRepository.saveAll(seatsToCreate);
+            log.info("Successfully initialized {} new seats (requested: {}, capped at: {}) for showtimeId: {}. Layout: A1-{} up to {}{}.",
+                     seatsToCreate.size(), requestedTotalSeats, actualTotalSeatsToCreate, showtimeId,
+                     seatsPerRow, (char)('A' + (seatsToCreate.size() / seatsPerRow) - (seatsToCreate.size() % seatsPerRow == 0 ? 1: 0)),
+                     seatsToCreate.size() % seatsPerRow == 0 ? seatsPerRow : seatsToCreate.size() % seatsPerRow
+                     );
+            return String.format("Successfully initialized %d seats for showtime %d.", seatsToCreate.size(), showtimeId);
+        } else {
+            log.warn("No seats were generated for showtimeId: {}. Requested total seats: {}, Capped at: {}",
+                     showtimeId, requestedTotalSeats, actualTotalSeatsToCreate);
+            return String.format("No seats generated for showtime %d (requested totalSeats: %d, capped at: %d).",
+                                 showtimeId, requestedTotalSeats, actualTotalSeatsToCreate);
+        }
     }
 
+    // ... (rest of the BookingService class remains the same)
+    // getSeatsForShowtime, createBooking, lockSeats, updateSeatsForPendingPayment,
+    // confirmSeatsAsBooked, releaseSeats, getShowtimeDetails, validateShowtimeForBooking,
+    // processPayment, getBookingById, getBookingsByUserId, cancelBooking, simulateRefund,
+    // cleanupExpiredSeatLocks, convertToDto
+    // Make sure all these methods are still present below this point.
+    // ...
+
+
+    /**
+     * Retrieves the seat layout for a given showtime.
+     *
+     * @param showtimeId The ID of the showtime.
+     * @return A list of DTOs representing each seat's status.
+     */
+    public List<ShowtimeSeatResponseDto> getSeatsForShowtime(Long showtimeId) {
+        log.debug("Fetching seat layout for showtimeId: {}", showtimeId);
+
+        List<ShowtimeSeat> seats = showtimeSeatRepository.findAllByShowtimeId(showtimeId);
+
+        if (seats.isEmpty()) {
+            log.warn("No seats found for showtimeId: {}. Attempting to validate showtime existence.", showtimeId);
+            // Check if the showtime itself is valid before concluding seats are just not initialized.
+            try {
+                getShowtimeDetails(showtimeId); // This will throw ResourceNotFoundException if showtime doesn't exist
+                // If getShowtimeDetails succeeds, it means showtime is valid but seats are not initialized.
+                log.warn("Showtime {} is valid, but no seats are initialized.", showtimeId);
+            } catch (ResourceNotFoundException e) {
+                log.warn("Showtime {} not found in catalog. Cannot provide seat layout.", showtimeId);
+                throw e; // Re-throw because the primary resource (showtime) is missing.
+            }
+            return Collections.emptyList(); // Return empty if showtime valid but seats not initialized
+        }
+
+        Comparator<ShowtimeSeat> seatComparator = Comparator
+            .comparing((ShowtimeSeat seat) -> seat.getSeatIdentifier().substring(0, 1)) // Sort by row letter
+            .thenComparingInt(seat -> { // Then by seat number
+                try {
+                    return Integer.parseInt(seat.getSeatIdentifier().substring(1));
+                } catch (NumberFormatException e) {
+                    log.warn("Could not parse seat number for identifier '{}'. Using 0 for sorting.", seat.getSeatIdentifier());
+                    return 0; // Fallback for non-standard seat numbers
+                }
+            });
+
+        return seats.stream()
+                .sorted(seatComparator)
+                .map(seat -> ShowtimeSeatResponseDto.builder()
+                        .id(seat.getId())
+                        .seatIdentifier(seat.getSeatIdentifier())
+                        .status(seat.getStatus())
+                        .userId(seat.getUserId())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Creates a new booking, including seat locking and payment processing.
+     *
+     * @param request The booking request DTO.
+     * @param userId  The ID of the user making the booking.
+     * @return A DTO representing the created booking.
+     */
+    @Transactional
+    public BookingResponseDto createBooking(BookingRequestDto request, String userId) {
+        log.info("Attempting to create booking for user: {}, showtime: {}, seats: {}",
+                 userId, request.getShowtimeId(), request.getSelectedSeats());
+
+        if (request.getSelectedSeats() == null || request.getSelectedSeats().isEmpty()) {
+            throw new BookingException("No seats selected for booking.", request.getShowtimeId());
+        }
+
+        ShowtimeDto showtimeDto = getShowtimeDetails(request.getShowtimeId());
+        validateShowtimeForBooking(showtimeDto);
+
+        List<ShowtimeSeat> lockedSeats = lockSeats(request.getShowtimeId(), request.getSelectedSeats(), userId);
+
+        Booking booking = null;
+        try {
+            BigDecimal totalPrice = showtimeDto.getPrice().multiply(BigDecimal.valueOf(lockedSeats.size()));
+            booking = Booking.builder()
+                    .userId(userId)
+                    .showtimeId(request.getShowtimeId())
+                    .movieId(showtimeDto.getMovie().getId())
+                    .theaterId(showtimeDto.getTheater().getId())
+                    .selectedSeats(request.getSelectedSeats()) // Store identifiers
+                    .totalPrice(totalPrice)
+                    .bookingTime(LocalDateTime.now())
+                    .status(BookingStatus.PENDING_PAYMENT) // Initial status
+                    .movieTitle(showtimeDto.getMovie().getTitle())
+                    .theaterName(showtimeDto.getTheater().getName())
+                    .showtimeDateTime(showtimeDto.getShowtime())
+                    .build();
+            booking = bookingRepository.save(booking);
+            log.info("Initial booking record created with id: {}, status: PENDING_PAYMENT", booking.getId());
+
+            updateSeatsForPendingPayment(lockedSeats, booking.getId(), userId);
+
+            PaymentResponseDto paymentResponse = processPayment(booking);
+
+            if (paymentResponse.getStatus() == PaymentResponseDto.PaymentStatus.SUCCEEDED) {
+                confirmSeatsAsBooked(lockedSeats, booking.getId());
+                booking.setStatus(BookingStatus.CONFIRMED);
+                booking.setPaymentTransactionId(paymentResponse.getTransactionId());
+                log.info("Booking id: {} payment successful. Status: CONFIRMED. Transaction ID: {}", booking.getId(), paymentResponse.getTransactionId());
+            } else {
+                log.warn("Payment failed for booking id: {}. Reason: {}. Releasing seats.", booking.getId(), paymentResponse.getMessage());
+                releaseSeats(lockedSeats, "Payment failed for bookingId: " + booking.getId());
+                booking.setStatus(BookingStatus.PAYMENT_FAILED);
+            }
+        } catch (Exception e) {
+            log.error("Exception during booking creation process for showtime {}. Releasing seats if locked.", request.getShowtimeId(), e);
+            if (lockedSeats != null && !lockedSeats.isEmpty()) {
+                String releaseReason = "Exception during booking creation: " + e.getMessage();
+                if (booking != null && booking.getId() != null) {
+                     releaseReason += " (Booking ID: " + booking.getId() + ")";
+                }
+                releaseSeats(lockedSeats, releaseReason);
+            }
+            if (booking != null && booking.getId() != null && booking.getStatus() == BookingStatus.PENDING_PAYMENT) {
+                booking.setStatus(BookingStatus.PAYMENT_FAILED); // Mark booking as failed
+            }
+            // Re-throw a more specific booking exception or the original one
+            if (e instanceof BookingException) throw (BookingException) e;
+            throw new BookingException("An error occurred during booking creation: " + e.getMessage(), request.getShowtimeId(), e);
+        } finally {
+            if (booking != null && booking.getId() != null) { // Ensure booking is saved if it exists
+                booking = bookingRepository.save(booking);
+            }
+        }
+        return convertToDto(booking);
+    }
+
+    private List<ShowtimeSeat> lockSeats(Long showtimeId, List<String> seatIdentifiers, String userId) {
+        log.debug("Attempting to lock seats: {} for showtime: {} by user: {}", seatIdentifiers, showtimeId, userId);
+        List<ShowtimeSeat> successfullyLockedSeats = new ArrayList<>();
+        LocalDateTime lockExpiryTime = LocalDateTime.now().plusMinutes(SEAT_LOCK_DURATION_MINUTES);
+
+        for (String seatId : seatIdentifiers) {
+            ShowtimeSeat seat = showtimeSeatRepository.findByShowtimeIdAndSeatIdentifier(showtimeId, seatId)
+                .orElseThrow(() -> {
+                    log.warn("Seat {} not found for showtime {} during lock attempt.", seatId, showtimeId);
+                    return new BookingException("Seat " + seatId + " does not exist for this showtime. Please refresh seat selection.", showtimeId);
+                });
+
+            if (seat.getStatus() == SeatStatus.AVAILABLE) {
+                try {
+                    seat.setStatus(SeatStatus.SELECTED_TEMP);
+                    seat.setUserId(userId);
+                    seat.setLockedUntil(lockExpiryTime);
+                    showtimeSeatRepository.save(seat); // Optimistic lock check happens here
+                    successfullyLockedSeats.add(seat);
+                    log.info("Successfully locked seat: {} for showtime {} by user {}", seatId, showtimeId, userId);
+                } catch (OptimisticLockException ole) {
+                    log.warn("Optimistic lock failed for seat {} on showtime {}. Seat modified concurrently.", seatId, showtimeId, ole);
+                    throw new BookingException("Seat " + seatId + " was booked by another user while you were selecting. Please try again.", showtimeId);
+                }
+            } else {
+                log.warn("Seat {} for showtime {} is not available for locking. Current status: {}", seatId, showtimeId, seat.getStatus());
+                throw new BookingException("Seat " + seatId + " is no longer available. Current status: " + seat.getStatus(), showtimeId);
+            }
+        }
+        return successfullyLockedSeats;
+    }
+
+    private void updateSeatsForPendingPayment(List<ShowtimeSeat> seats, Long bookingId, String userId) {
+        LocalDateTime lockExpiryTime = LocalDateTime.now().plusMinutes(SEAT_LOCK_DURATION_MINUTES);
+        for (ShowtimeSeat seat : seats) {
+            ShowtimeSeat freshSeat = showtimeSeatRepository.findById(seat.getId()) // Re-fetch to ensure working with latest version
+                .orElseThrow(() -> new BookingException("Seat with id " + seat.getId() + " not found during PENDING_PAYMENT update for booking " + bookingId, bookingId));
+
+            if (freshSeat.getStatus() != SeatStatus.SELECTED_TEMP || !userId.equals(freshSeat.getUserId())) {
+                log.error("Seat {} for showtime {} (booking {}) was not in expected state (SELECTED_TEMP by user {}) for PENDING_PAYMENT update. Current status: {}, current user: {}",
+                           freshSeat.getSeatIdentifier(), freshSeat.getShowtimeId(), bookingId, userId, freshSeat.getStatus(), freshSeat.getUserId());
+                throw new BookingException("Seat " + freshSeat.getSeatIdentifier() + " state changed unexpectedly. Please retry booking.", bookingId);
+            }
+            freshSeat.setStatus(SeatStatus.PENDING_PAYMENT);
+            freshSeat.setBookingId(bookingId);
+            freshSeat.setLockedUntil(lockExpiryTime); // Extend lock during payment
+            showtimeSeatRepository.save(freshSeat);
+        }
+        log.info("Updated {} seats to PENDING_PAYMENT for bookingId {}", seats.size(), bookingId);
+    }
+
+    private void confirmSeatsAsBooked(List<ShowtimeSeat> seats, Long bookingId) {
+        for (ShowtimeSeat seat : seats) {
+            ShowtimeSeat freshSeat = showtimeSeatRepository.findById(seat.getId())
+                .orElseThrow(() -> new BookingException("Seat with id " + seat.getId() + " not found during BOOKED confirmation for booking " + bookingId, bookingId));
+
+            if (freshSeat.getStatus() != SeatStatus.PENDING_PAYMENT || !bookingId.equals(freshSeat.getBookingId())) {
+                log.error("CRITICAL: Seat {} (booking {}) was not PENDING_PAYMENT for this booking during confirmation. Current status: {}, current bookingId: {}. Payment might have processed for an invalid seat state!",
+                           freshSeat.getSeatIdentifier(), bookingId, freshSeat.getStatus(), freshSeat.getBookingId());
+                throw new BookingException("Seat " + freshSeat.getSeatIdentifier() + " state was inconsistent during booking confirmation. Please contact support.", bookingId);
+            }
+            freshSeat.setStatus(SeatStatus.BOOKED);
+            freshSeat.setLockedUntil(null); // Remove lock expiry
+            freshSeat.setUserId(null); // User associated via booking, not directly on seat once booked. Or keep for audit.
+            showtimeSeatRepository.save(freshSeat);
+        }
+        log.info("Confirmed {} seats as BOOKED for bookingId {}", seats.size(), bookingId);
+    }
+
+    private void releaseSeats(List<ShowtimeSeat> seatsToRelease, String reason) {
+        if (seatsToRelease == null || seatsToRelease.isEmpty()) {
+            return;
+        }
+        log.warn("Attempting to release {} seats. Reason: {}", seatsToRelease.size(), reason);
+        for (ShowtimeSeat seatToRelease : seatsToRelease) {
+            if (seatToRelease.getId() == null) {
+                log.warn("Skipping release for a seat without an ID (likely not persisted or detached): {}", seatToRelease);
+                continue;
+            }
+            // Re-fetch the seat to ensure we have the latest state before modifying
+            showtimeSeatRepository.findById(seatToRelease.getId()).ifPresent(currentSeat -> {
+                // Only release if it's still in a temporary or pending state related to this flow
+                if (currentSeat.getStatus() == SeatStatus.SELECTED_TEMP || currentSeat.getStatus() == SeatStatus.PENDING_PAYMENT) {
+                    log.info("Releasing seat: id={}, identifier={}, showtimeId={}, oldStatus={}, userId={}, bookingId={}. Reason: {}",
+                             currentSeat.getId(), currentSeat.getSeatIdentifier(), currentSeat.getShowtimeId(),
+                             currentSeat.getStatus(), currentSeat.getUserId(), currentSeat.getBookingId(), reason);
+                    currentSeat.setStatus(SeatStatus.AVAILABLE);
+                    currentSeat.setUserId(null);
+                    currentSeat.setBookingId(null);
+                    currentSeat.setLockedUntil(null);
+                    showtimeSeatRepository.save(currentSeat);
+                } else {
+                    log.warn("Seat id={}, identifier={}, showtimeId={} was not in an expected state ({}/{}) for release. Current status: {}. Not releasing.",
+                             currentSeat.getId(), currentSeat.getSeatIdentifier(), currentSeat.getShowtimeId(),
+                             SeatStatus.SELECTED_TEMP, SeatStatus.PENDING_PAYMENT, currentSeat.getStatus());
+                }
+            });
+        }
+    }
 
     private ShowtimeDto getShowtimeDetails(Long showtimeId) {
         log.debug("Fetching showtime details for id: {}", showtimeId);
@@ -129,82 +370,81 @@ public class BookingService {
             ResponseEntity<ShowtimeDto> response = movieCatalogClient.getShowtimeById(showtimeId);
             if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
                 log.error("Failed to fetch showtime details for id: {}. Status: {}", showtimeId, response.getStatusCode());
-                throw new BookingException("Could not retrieve showtime details.", null);
+                if (response.getStatusCode().value() == 404) {
+                    throw new ResourceNotFoundException("Showtime", "id", showtimeId);
+                }
+                throw new BookingException("Could not retrieve showtime details from catalog service.", showtimeId);
             }
-             // Ensure nested objects are present if needed for denormalization
             ShowtimeDto dto = response.getBody();
-            if (dto.getMovie() == null || dto.getTheater() == null) {
-                 log.error("Incomplete showtime details received for id: {}", showtimeId);
-                 throw new BookingException("Incomplete showtime details received from catalog service.", null);
+            if (dto.getMovie() == null || dto.getTheater() == null || dto.getPrice() == null) {
+                 log.error("Incomplete showtime details received for id: {}. Movie, Theater, or Price might be null.", showtimeId);
+                 throw new BookingException("Incomplete showtime details (Movie, Theater, or Price missing).", showtimeId);
             }
             log.debug("Successfully fetched showtime details for id: {}", showtimeId);
             return dto;
         } catch (MovieCatalogClient.ServiceUnavailableException | CallNotPermittedException e) {
-             log.error("Error fetching showtime details for id: {} due to service availability/circuit breaker", showtimeId, e);
-            throw new BookingException("Movie Catalog Service is currently unavailable. Please try again later.", null);
+            log.error("Movie Catalog Service unavailable or circuit breaker open for showtimeId {}: {}", showtimeId, e.getMessage());
+            throw new BookingException("Movie Catalog Service is currently unavailable. Please try again later.", showtimeId, e);
         } catch (FeignException e) {
-             log.error("Feign error fetching showtime details for id: {}", showtimeId, e);
-             if (e.status() == 404) {
-                 throw new ResourceNotFoundException("Showtime", "id", showtimeId);
-             }
-             throw new BookingException("Error communicating with Movie Catalog Service.", null);
-        } catch (Exception e) {
-             log.error("Unexpected error fetching showtime details for id: {}", showtimeId, e);
-             throw new BookingException("An unexpected error occurred while fetching showtime details.", null);
+            log.error("Feign error fetching showtime details for id: {}. Status: {}", showtimeId, e.status(), e);
+            if (e.status() == 404) {
+                throw new ResourceNotFoundException("Showtime", "id", showtimeId);
+            }
+            throw new BookingException("Error communicating with Movie Catalog Service.", showtimeId, e);
+        } catch (Exception e) { // Catch any other unexpected exceptions
+            log.error("Unexpected error fetching showtime details for id: {}", showtimeId, e);
+            throw new BookingException("An unexpected error occurred while fetching showtime details.", showtimeId, e);
         }
     }
 
-    private void validateShowtime(ShowtimeDto showtimeDto, int requestedSeats) {
+    private void validateShowtimeForBooking(ShowtimeDto showtimeDto) {
          if (showtimeDto.getShowtime().isBefore(LocalDateTime.now())) {
-            log.warn("Attempted booking for past showtime id: {}", showtimeDto.getId());
+            log.warn("Attempted booking for past showtime id: {}, time: {}", showtimeDto.getId(), showtimeDto.getShowtime());
             throw new BookingException("Cannot book for a showtime that has already passed.", showtimeDto.getId());
         }
-        if (showtimeDto.getAvailableSeats() == null || showtimeDto.getAvailableSeats() < requestedSeats) {
-            log.warn("Insufficient seats for showtime id: {}. Available: {}, Requested: {}",
-                     showtimeDto.getId(), showtimeDto.getAvailableSeats(), requestedSeats);
-            throw new BookingException(String.format("Not enough seats available for showtime. Only %d left.", showtimeDto.getAvailableSeats()), showtimeDto.getId());
-        }
+        // Add other validations, e.g., if showtime is marked as "cancelled" in catalog.
     }
 
-     private PaymentResponseDto processPayment(Booking booking) {
+    private PaymentResponseDto processPayment(Booking booking) {
         log.info("Initiating payment process for booking id: {}", booking.getId());
         PaymentRequestDto paymentRequest = PaymentRequestDto.builder()
                 .bookingId(booking.getId())
                 .userId(booking.getUserId())
                 .amount(booking.getTotalPrice())
-                .currency("INR") // Example currency, make configurable
-                .paymentMethodNonce("fake-nonce") // Placeholder for actual payment method details
+                .currency("INR") // Assuming INR, make configurable if needed
+                .paymentMethodNonce("fake-card-nonce") // Placeholder for actual payment gateway nonce
                 .build();
         try {
              ResponseEntity<PaymentResponseDto> response = paymentClient.processPayment(paymentRequest);
              if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
                   log.error("Payment processing failed for booking id: {}. Status: {}", booking.getId(), response.getStatusCode());
-                  // Return a failed response DTO based on the error status
                    return PaymentResponseDto.builder()
                             .bookingId(booking.getId())
                             .status(PaymentResponseDto.PaymentStatus.FAILED)
                             .message("Payment processing failed with status: " + response.getStatusCode())
                             .build();
              }
-             log.info("Payment response received for booking id: {}. Status: {}", booking.getId(), response.getBody().getStatus());
-             return response.getBody();
-        } catch (MovieCatalogClient.ServiceUnavailableException | CallNotPermittedException e) { // Reusing exception for demo
-             log.error("Payment processing failed for booking id: {} due to service availability/circuit breaker", booking.getId(), e);
-              return PaymentResponseDto.builder()
-                        .bookingId(booking.getId())
-                        .status(PaymentResponseDto.PaymentStatus.FAILED)
-                        .message("Payment service unavailable. Please try again later.")
-                        .build();
+             PaymentResponseDto paymentResponse = response.getBody();
+             log.info("Payment response for booking id: {}. Status: {}, TransactionId: {}",
+                      booking.getId(), paymentResponse.getStatus(), paymentResponse.getTransactionId());
+             return paymentResponse;
+        } catch (PaymentClient.PaymentFallback.ServiceUnavailableException | CallNotPermittedException e) {
+            log.error("Payment Service unavailable or circuit breaker open for booking {}: {}", booking.getId(), e.getMessage());
+            return PaymentResponseDto.builder()
+                      .bookingId(booking.getId())
+                      .status(PaymentResponseDto.PaymentStatus.FAILED)
+                      .message("Payment service is currently unavailable. Please try again later.")
+                      .build();
         } catch (FeignException e) {
-            log.error("Feign error during payment processing for booking id: {}", booking.getId(), e);
-             return PaymentResponseDto.builder()
-                        .bookingId(booking.getId())
-                        .status(PaymentResponseDto.PaymentStatus.FAILED)
-                        .message("Error communicating with Payment Service.")
-                        .build();
+            log.error("Feign error during payment processing for booking id: {}. Status: {}", booking.getId(), e.status(), e);
+            return PaymentResponseDto.builder()
+                       .bookingId(booking.getId())
+                       .status(PaymentResponseDto.PaymentStatus.FAILED)
+                       .message("Error communicating with Payment Service.")
+                       .build();
         } catch (Exception e) {
              log.error("Unexpected error during payment processing for booking id: {}", booking.getId(), e);
-              return PaymentResponseDto.builder()
+             return PaymentResponseDto.builder()
                         .bookingId(booking.getId())
                         .status(PaymentResponseDto.PaymentStatus.FAILED)
                         .message("An unexpected error occurred during payment.")
@@ -212,42 +452,10 @@ public class BookingService {
         }
     }
 
-     private boolean decreaseSeatsInCatalog(Long showtimeId, int seatsToDecrease) {
-        log.info("Attempting to decrease seats by {} for showtime id: {}", seatsToDecrease, showtimeId);
-        try {
-            ResponseEntity<Void> response = movieCatalogClient.decreaseSeats(showtimeId, seatsToDecrease);
-            boolean success = response.getStatusCode().is2xxSuccessful();
-            if(success) {
-                 log.info("Successfully decreased seats for showtime id: {}", showtimeId);
-            } else {
-                 log.error("Failed to decrease seats for showtime id: {}. Status code: {}", showtimeId, response.getStatusCode());
-            }
-            return success;
-        } catch (MovieCatalogClient.ServiceUnavailableException | CallNotPermittedException e) {
-            log.error("Failed to decrease seats for showtime id: {} due to service availability/circuit breaker", showtimeId, e);
-            return false;
-        } catch (FeignException e) {
-             log.error("Feign error while decreasing seats for showtime id: {}", showtimeId, e);
-             // Check if the error was due to insufficient seats (e.g., 400 Bad Request from catalog service)
-             if (e.status() == 400) {
-                 // Potentially parse error message if available from catalog service
-                 log.warn("Seat decrease failed for showtime {}: {}", showtimeId, "Likely insufficient seats.");
-             }
-             return false;
-        } catch (Exception e) {
-            log.error("Unexpected error while decreasing seats for showtime id: {}", showtimeId, e);
-            return false;
-        }
-    }
-
-
-     // --- Read Operations ---
-
     public BookingResponseDto getBookingById(Long id, String userId) {
         log.info("Fetching booking by id: {} for user: {}", id, userId);
-        // Ensure user can only fetch their own booking
         Booking booking = bookingRepository.findByIdAndUserId(id, userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Booking", "id/userId", id + "/" + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("Booking", "id " + id + " for user " + userId, null));
         return convertToDto(booking);
     }
 
@@ -259,68 +467,96 @@ public class BookingService {
                 .collect(Collectors.toList());
     }
 
-    // --- Cancellation Logic (Placeholder) ---
     @Transactional
     public BookingResponseDto cancelBooking(Long bookingId, String userId) {
-         log.warn("Attempting cancellation for booking id: {} by user: {}", bookingId, userId);
-         Booking booking = bookingRepository.findByIdAndUserId(bookingId, userId)
-                 .orElseThrow(() -> new ResourceNotFoundException("Booking", "id/userId", bookingId + "/" + userId));
+        log.warn("User {} attempting cancellation for booking id: {}", userId, bookingId);
+        Booking booking = bookingRepository.findByIdAndUserId(bookingId, userId)
+                 .orElseThrow(() -> new ResourceNotFoundException("Booking", "id " + bookingId + " for user " + userId, null));
 
-        // 1. Check if cancellation is allowed (e.g., status is CONFIRMED, showtime is in future)
         if (booking.getStatus() != BookingStatus.CONFIRMED) {
-            throw new BookingException("Booking cannot be cancelled as it is not confirmed.", bookingId);
+            log.warn("Booking {} cannot be cancelled. Status is: {}", bookingId, booking.getStatus());
+            throw new BookingException("Booking cannot be cancelled as it is not in CONFIRMED state.", bookingId);
         }
-        if (booking.getShowtimeDateTime() != null && booking.getShowtimeDateTime().isBefore(LocalDateTime.now().plusHours(2))) { // Example: Allow cancellation up to 2 hours before
-             throw new BookingException("Booking cannot be cancelled this close to the showtime.", bookingId);
+        // Example cancellation policy: Not allowed if showtime is within 2 hours
+        if (booking.getShowtimeDateTime() != null && booking.getShowtimeDateTime().isBefore(LocalDateTime.now().plusHours(2))) {
+            log.warn("Booking {} cancellation rejected: Too close to showtime ({}).", bookingId, booking.getShowtimeDateTime());
+            throw new BookingException("Booking cannot be cancelled this close to the showtime (less than 2 hours).", bookingId);
         }
 
-        // 2. TODO: Process Refund via Payment Client
+        // Simulate refund process
         log.info("Initiating refund for booking id: {}", bookingId);
-        // RefundResponseDto refundResponse = paymentClient.refundPayment(...);
-        boolean refundSuccessful = true; // Assume success for now
+        boolean refundSuccessful = simulateRefund(booking); // Placeholder for actual refund logic
 
         if (refundSuccessful) {
-             // 3. Increase Seats in Catalog Service
-            boolean seatsIncreased = increaseSeatsInCatalog(booking.getShowtimeId(), booking.getNumberOfSeats());
-            if (seatsIncreased) {
-                booking.setStatus(BookingStatus.CANCELLED);
-                 log.info("Booking id: {} cancelled successfully.", bookingId);
-            } else {
-                // Refund succeeded, but increasing seats failed! Log error, maybe manual intervention needed.
-                 log.error("CRITICAL: Refund succeeded for booking id: {} but failed to increase seat count.", bookingId);
-                 // Keep status as CONFIRMED? Or a special 'CANCELLATION_FAILED_SEATS' status?
-                 throw new BookingException("Cancellation failed: Could not release seats after successful refund. Please contact support.", bookingId);
-            }
+            List<ShowtimeSeat> seatsToRelease = showtimeSeatRepository.findAllByBookingId(bookingId);
+            releaseSeats(seatsToRelease, "Booking cancellation for bookingId: " + bookingId);
+            booking.setStatus(BookingStatus.CANCELLED);
+            log.info("Booking id: {} cancelled successfully by user {}.", bookingId, userId);
         } else {
-             log.error("Refund failed for booking id: {}", bookingId);
-             throw new BookingException("Cancellation failed: Could not process refund.", bookingId);
+            log.error("Refund failed for booking id: {}. Booking not cancelled.", bookingId);
+            // Depending on policy, if refund fails, booking might not be cancelled.
+            throw new BookingException("Cancellation failed: Could not process refund at this time.", bookingId);
         }
 
-         Booking updatedBooking = bookingRepository.save(booking);
-         return convertToDto(updatedBooking);
+        Booking updatedBooking = bookingRepository.save(booking);
+        return convertToDto(updatedBooking);
     }
 
-     private boolean increaseSeatsInCatalog(Long showtimeId, int seatsToIncrease) {
-        log.info("Attempting to increase seats by {} for showtime id: {}", seatsToIncrease, showtimeId);
-         try {
-            ResponseEntity<Void> response = movieCatalogClient.increaseSeats(showtimeId, seatsToIncrease);
-            boolean success = response.getStatusCode().is2xxSuccessful();
-             if(success) {
-                 log.info("Successfully increased seats for showtime id: {}", showtimeId);
-            } else {
-                 log.error("Failed to increase seats for showtime id: {}. Status code: {}", showtimeId, response.getStatusCode());
+    private boolean simulateRefund(Booking booking) {
+        // Placeholder for actual refund logic with a payment gateway
+        log.info("Simulating refund for booking id: {}, amount: {}", booking.getId(), booking.getTotalPrice());
+        // In a real system, interact with paymentClient to process refund
+        return true; // Assume refund is successful for now
+    }
+
+    @Transactional
+    public void cleanupExpiredSeatLocks() {
+        LocalDateTime cutoffTime = LocalDateTime.now().minusMinutes(SEAT_LOCK_DURATION_MINUTES + 2); // Add a small buffer
+        log.debug("Running cleanup for seat locks expired before: {}", cutoffTime);
+
+        List<ShowtimeSeat> expiredTempSeats = showtimeSeatRepository.findAllByStatusAndLockedUntilBefore(SeatStatus.SELECTED_TEMP, cutoffTime);
+        if (!expiredTempSeats.isEmpty()) {
+            log.info("Found {} expired SELECTED_TEMP seats to clean up.", expiredTempSeats.size());
+            releaseSeats(expiredTempSeats, "Expired SELECTED_TEMP lock cleanup job.");
+        }
+
+        List<ShowtimeSeat> expiredPendingSeats = showtimeSeatRepository.findAllByStatusAndLockedUntilBefore(SeatStatus.PENDING_PAYMENT, cutoffTime);
+        if (!expiredPendingSeats.isEmpty()) {
+            log.info("Found {} expired PENDING_PAYMENT seats to clean up.", expiredPendingSeats.size());
+            for (ShowtimeSeat seat : expiredPendingSeats) {
+                if (seat.getBookingId() != null) {
+                    bookingRepository.findById(seat.getBookingId()).ifPresent(booking -> {
+                        if (booking.getStatus() == BookingStatus.PENDING_PAYMENT) {
+                            log.warn("Updating booking {} to PAYMENT_FAILED due to expired seat lock for seat id {}",
+                                     booking.getId(), seat.getId());
+                            booking.setStatus(BookingStatus.PAYMENT_FAILED);
+                            bookingRepository.save(booking);
+                        }
+                    });
+                }
             }
-            return success;
-        } catch (MovieCatalogClient.ServiceUnavailableException | CallNotPermittedException e) {
-            log.error("Failed to increase seats for showtime id: {} due to service availability/circuit breaker", showtimeId, e);
-            return false; // Indicate failure
-        } catch (FeignException e) {
-             log.error("Feign error while increasing seats for showtime id: {}", showtimeId, e);
-             return false;
-        } catch (Exception e) {
-            log.error("Unexpected error while increasing seats for showtime id: {}", showtimeId, e);
-            return false;
+            releaseSeats(expiredPendingSeats, "Expired PENDING_PAYMENT lock cleanup job.");
         }
+        log.debug("Seat lock cleanup job finished.");
     }
 
+    private BookingResponseDto convertToDto(Booking booking) {
+        if (booking == null) return null;
+        return BookingResponseDto.builder()
+                .id(booking.getId())
+                .userId(booking.getUserId())
+                .showtimeId(booking.getShowtimeId())
+                .movieId(booking.getMovieId())
+                .theaterId(booking.getTheaterId())
+                .numberOfSeats(booking.getNumberOfSeats()) // Derived from selectedSeats.size()
+                .selectedSeats(booking.getSelectedSeats())
+                .totalPrice(booking.getTotalPrice())
+                .bookingTime(booking.getBookingTime())
+                .status(booking.getStatus())
+                .paymentTransactionId(booking.getPaymentTransactionId())
+                .movieTitle(booking.getMovieTitle())
+                .theaterName(booking.getTheaterName())
+                .showtimeDateTime(booking.getShowtimeDateTime())
+                .build();
+    }
 }
