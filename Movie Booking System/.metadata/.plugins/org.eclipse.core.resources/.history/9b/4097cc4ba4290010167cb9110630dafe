@@ -1,0 +1,5 @@
+package com.movie.booking.dto;
+
+public class ShowtimeDto {
+
+}

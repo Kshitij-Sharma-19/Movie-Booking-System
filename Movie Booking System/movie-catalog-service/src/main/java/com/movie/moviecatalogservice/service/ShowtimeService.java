@@ -1,0 +1,214 @@
+package com.movie.moviecatalogservice.service;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.movie.moviecatalogservice.dto.MovieDto;
+import com.movie.moviecatalogservice.dto.ShowtimeDto;
+import com.movie.moviecatalogservice.dto.TheaterDto;
+import com.movie.moviecatalogservice.exception.ResourceNotFoundException;
+import com.movie.moviecatalogservice.model.Movie;
+import com.movie.moviecatalogservice.model.Showtime;
+import com.movie.moviecatalogservice.model.Theater;
+import com.movie.moviecatalogservice.repository.MovieRepository;
+import com.movie.moviecatalogservice.repository.ShowtimeRepository;
+import com.movie.moviecatalogservice.repository.TheaterRepository;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+@Transactional
+public class ShowtimeService {
+
+    private final ShowtimeRepository showtimeRepository;
+    private final MovieRepository movieRepository;
+    private final TheaterRepository theaterRepository;
+
+    // --- Mapping Logic ---
+    private ShowtimeDto convertToDto(Showtime showtime) {
+        if (showtime == null) return null;
+
+        Movie movie = showtime.getMovie();
+        Theater theater = showtime.getTheater();
+
+        MovieDto movieDto = movie != null ? MovieDto.builder()
+                .id(movie.getId())
+                .title(movie.getTitle())
+                .genre(movie.getGenre())
+                .description(movie.getDescription())
+                .durationMinutes(movie.getDurationMinutes())
+                .releaseDate(movie.getReleaseDate())
+                .director(movie.getDirector())
+                .castMembers(movie.getCastMembers())
+                .posterUrl(movie.getPosterUrl())
+                .build() : null;
+
+        TheaterDto theaterDto = theater != null ? TheaterDto.builder()
+                .id(theater.getId())
+                .name(theater.getName())
+                .city(theater.getCity())
+                .address(theater.getAddress())
+                .totalSeats(theater.getTotalSeats())
+                .build() : null;
+
+        return ShowtimeDto.builder()
+                .id(showtime.getId())
+                .movieId(movie != null ? movie.getId() : null)
+                .theaterId(theater != null ? theater.getId() : null)
+                .showtime(showtime.getShowtime())
+                .price(showtime.getPrice())
+                .availableSeats(showtime.getAvailableSeats())
+                .movie(movieDto)
+                .theater(theaterDto)
+                .build();
+    }
+
+    // Note: Conversion to entity needs Movie and Theater objects
+    private Showtime convertToEntity(ShowtimeDto showtimeDto, Movie movie, Theater theater) {
+         return Showtime.builder()
+                .movie(movie)
+                .theater(theater)
+                .showtime(showtimeDto.getShowtime())
+                .price(showtimeDto.getPrice())
+                .availableSeats(showtimeDto.getAvailableSeats())
+                // ID is set by JPA on save
+                .build();
+    }
+    // --- End Mapping Logic ---
+
+
+    public List<ShowtimeDto> getAllShowtimes() {
+        log.info("Fetching all showtimes");
+        return showtimeRepository.findAll().stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
+
+    public ShowtimeDto getShowtimeById(Long id) {
+        log.info("Fetching showtime by id: {}", id);
+        Showtime showtime = showtimeRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Showtime", "id", id));
+        return convertToDto(showtime);
+    }
+
+     public List<ShowtimeDto> getShowtimesByMovieId(Long movieId) {
+        log.info("Fetching showtimes for movie id: {}", movieId);
+        if (!movieRepository.existsById(movieId)) {
+             throw new ResourceNotFoundException("Movie", "id", movieId);
+        }
+        return showtimeRepository.findByMovieId(movieId).stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
+
+    public List<ShowtimeDto> getShowtimesByMovieAndCityForDate(Long movieId, String city, LocalDate date) {
+        log.info("Fetching showtimes for movie id: {}, city: {}, date: {}", movieId, city, date);
+        if (!movieRepository.existsById(movieId)) {
+             throw new ResourceNotFoundException("Movie", "id", movieId);
+        }
+        LocalDateTime startOfDay = date.atStartOfDay();
+        LocalDateTime endOfDay = date.plusDays(1).atStartOfDay();
+
+        return showtimeRepository.findMovieShowtimesByCityAndTimeRange(movieId, city, startOfDay, endOfDay).stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
+
+
+    public ShowtimeDto addShowtime(ShowtimeDto showtimeDto) {
+        log.info("Adding new showtime for movie id: {} at theater id: {}", showtimeDto.getMovieId(), showtimeDto.getTheaterId());
+        Movie movie = movieRepository.findById(showtimeDto.getMovieId())
+                .orElseThrow(() -> new ResourceNotFoundException("Movie", "id", showtimeDto.getMovieId()));
+        Theater theater = theaterRepository.findById(showtimeDto.getTheaterId())
+                .orElseThrow(() -> new ResourceNotFoundException("Theater", "id", showtimeDto.getTheaterId()));
+
+        // Basic validation: Ensure available seats doesn't exceed theater capacity
+        if(showtimeDto.getAvailableSeats() > theater.getTotalSeats()) {
+            throw new IllegalArgumentException("Available seats cannot exceed theater capacity (" + theater.getTotalSeats() + ")");
+        }
+
+        Showtime showtime = convertToEntity(showtimeDto, movie, theater);
+        Showtime savedShowtime = showtimeRepository.save(showtime);
+        log.info("Showtime added successfully with id: {}", savedShowtime.getId());
+        return convertToDto(savedShowtime); // Convert back to include IDs and nested objects
+    }
+
+    public ShowtimeDto updateShowtime(Long id, ShowtimeDto showtimeDto) {
+        log.info("Updating showtime with id: {}", id);
+        Showtime existingShowtime = showtimeRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Showtime", "id", id));
+
+        // Fetch related entities if IDs have changed (or validate if they shouldn't change)
+        Movie movie = existingShowtime.getMovie();
+        if (!movie.getId().equals(showtimeDto.getMovieId())) {
+             movie = movieRepository.findById(showtimeDto.getMovieId())
+                .orElseThrow(() -> new ResourceNotFoundException("Movie", "id", showtimeDto.getMovieId()));
+            existingShowtime.setMovie(movie);
+        }
+
+        Theater theater = existingShowtime.getTheater();
+         if (!theater.getId().equals(showtimeDto.getTheaterId())) {
+             theater = theaterRepository.findById(showtimeDto.getTheaterId())
+                .orElseThrow(() -> new ResourceNotFoundException("Theater", "id", showtimeDto.getTheaterId()));
+            existingShowtime.setTheater(theater);
+        }
+
+         // Validate seat capacity again
+        if(showtimeDto.getAvailableSeats() > theater.getTotalSeats()) {
+            throw new IllegalArgumentException("Available seats cannot exceed theater capacity (" + theater.getTotalSeats() + ")");
+        }
+
+
+        // Update fields
+        existingShowtime.setShowtime(showtimeDto.getShowtime());
+        existingShowtime.setPrice(showtimeDto.getPrice());
+        existingShowtime.setAvailableSeats(showtimeDto.getAvailableSeats());
+
+        Showtime updatedShowtime = showtimeRepository.save(existingShowtime);
+        log.info("Showtime updated successfully for id: {}", id);
+        return convertToDto(updatedShowtime);
+    }
+
+    public void deleteShowtime(Long id) {
+        log.warn("Attempting to delete showtime with id: {}", id);
+        if (!showtimeRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Showtime", "id", id);
+        }
+        showtimeRepository.deleteById(id);
+        log.info("Showtime deleted successfully with id: {}", id);
+    }
+
+     // Called potentially by Booking Service to decrease seat count
+    public void decreaseAvailableSeats(Long showtimeId, int seatsToDecrease) {
+        log.info("Decreasing available seats for showtime id: {} by {}", showtimeId, seatsToDecrease);
+        Showtime showtime = showtimeRepository.findById(showtimeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Showtime", "id", showtimeId));
+
+        if (showtime.getAvailableSeats() < seatsToDecrease) {
+            throw new IllegalArgumentException("Not enough available seats for showtime id: " + showtimeId);
+        }
+        showtime.setAvailableSeats(showtime.getAvailableSeats() - seatsToDecrease);
+        showtimeRepository.save(showtime);
+         log.info("Seats decreased successfully for showtime id: {}. New count: {}", showtimeId, showtime.getAvailableSeats());
+    }
+
+    // Called potentially by Booking Service on cancellation to increase seat count
+    public void increaseAvailableSeats(Long showtimeId, int seatsToIncrease) {
+        log.info("Increasing available seats for showtime id: {} by {}", showtimeId, seatsToIncrease);
+         Showtime showtime = showtimeRepository.findById(showtimeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Showtime", "id", showtimeId));
+
+        // Optional: Check against total theater capacity if needed, though unlikely necessary here
+        showtime.setAvailableSeats(showtime.getAvailableSeats() + seatsToIncrease);
+        showtimeRepository.save(showtime);
+        log.info("Seats increased successfully for showtime id: {}. New count: {}", showtimeId, showtime.getAvailableSeats());
+    }
+}

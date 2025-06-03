@@ -1,0 +1,5 @@
+package com.movie.auth.exception;
+
+public class ResourceNotFoundException {
+
+}

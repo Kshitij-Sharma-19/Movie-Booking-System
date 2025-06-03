@@ -1,0 +1,5 @@
+package com.movie.userservice.dto;
+
+public class UpdateUserProfileRequestDto {
+
+}

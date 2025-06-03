@@ -1,0 +1,13 @@
+eclipse.preferences.version=1
+org.springframework.ide.eclipse.boot.wizard.PreferredSelections.artifactId=user-service
+org.springframework.ide.eclipse.boot.wizard.PreferredSelections.bootVersion=3.4.5
+org.springframework.ide.eclipse.boot.wizard.PreferredSelections.description=Service for managing User Profiles
+org.springframework.ide.eclipse.boot.wizard.PreferredSelections.groupId=com.movie
+org.springframework.ide.eclipse.boot.wizard.PreferredSelections.javaVersion=17
+org.springframework.ide.eclipse.boot.wizard.PreferredSelections.language=java
+org.springframework.ide.eclipse.boot.wizard.PreferredSelections.name=user-service
+org.springframework.ide.eclipse.boot.wizard.PreferredSelections.packageName=com.movie.userservice
+org.springframework.ide.eclipse.boot.wizard.PreferredSelections.packaging=jar
+org.springframework.ide.eclipse.boot.wizard.PreferredSelections.type=MAVEN
+org.springframework.ide.eclipse.boot.wizard.PreferredSelections.version=0.0.1-SNAPSHOT
+org.springframework.ide.eclipse.boot.wizard.initializr.url=https\://start.spring.io\n

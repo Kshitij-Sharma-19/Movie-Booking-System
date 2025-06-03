@@ -1,0 +1,20 @@
+# Server Configuration
+server.port=8888
+
+# Spring Application Configuration
+spring.application.name=config-server
+# Spring Cloud Config Server - Native Profile
+spring.cloud.config.server.native.search-locations=classpath:/config/
+
+# Eureka Client Configuration
+eureka.client.serviceUrl.defaultZone=${EUREKA_URI:http://localhost:8761/eureka/}
+eureka.client.fetch-registry=true
+eureka.client.register-with-eureka=true
+
+# Eureka Instance Configuration
+eureka.instance.prefer-ip-address=true
+# Optional: Uncomment and modify if you want a custom instance ID
+# eureka.instance.instance-id=${spring.application.name}:${spring.application.instance_id:${random.value}}
+
+# Management Actuator Endpoints Exposure
+management.endpoints.web.exposure.include=health,info,env,configprops

@@ -1,0 +1,71 @@
+package com.movie.moviecatalogservice.config;
+
+import javax.crypto.SecretKey;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.web.SecurityFilterChain;
+
+
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true) // Enable @PreAuthorize annotations
+public class SecurityConfig {
+
+	@Value("${jwt.secret}")
+	private String jwtSecret;
+	   
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(AbstractHttpConfigurer::disable) // Disable CSRF for stateless APIs
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Stateless
+            .authorizeHttpRequests(authz -> authz
+                // Allow public access to GET requests for movies, theaters, and showtime searches/listings
+                .requestMatchers(HttpMethod.GET,
+                                 "/api/v1/movies/**",
+                                 "/api/v1/theaters/**",
+                                 "/api/v1/showtimes/search", // Public search endpoint
+                                 "/api/v1/showtimes/movie/**", // Public listing by movie
+                                 "/api/v1/showtimes/{id}" // Allow getting specific showtime details
+                                 ).permitAll()
+                 // Allow public access to Swagger UI and API docs
+                .requestMatchers("/swagger-ui/**",
+                                 "/v3/api-docs/**",
+                                 "/swagger-resources/**",
+                                 "/webjars/**",
+                                 "/api-docs/**",
+                                 "/actuator/health").permitAll()
+                // All other requests (POST, PUT, DELETE, PATCH on catalog items) require authentication
+                .anyRequest().authenticated()
+            )
+            // Configure as an OAuth2 Resource Server validating JWTs
+            .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults())); // Use default JWT validation (uses JwtDecoder bean)
+
+        return http.build();
+    }
+
+    @Bean
+    public JwtDecoder jwtDecoder() {
+        // Configure the JwtDecoder to use the JWK Set URI from the auth-service
+        byte[] keyBytes = Decoders.BASE64.decode(this.jwtSecret);
+        // Create a SecretKey suitable for the HMAC algorithm used (HS256)
+        SecretKey key = new SecretKeySpec(keyBytes, 0, keyBytes.length, "HmacSHA256");
+
+        // Configure the JwtDecoder to use the symmetric secret key
+        return NimbusJwtDecoder.withSecretKey(key).build();
+    }
+
+    // No need for AuthenticationManager, PasswordEncoder, UserDetailsService here
+    // as this service relies on the JWT issued by the auth-service for authentication and authorization.
+}

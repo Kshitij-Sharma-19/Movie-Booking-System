@@ -1,0 +1,67 @@
+package com.movie.gateway.config;
+
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
+import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
+import org.springframework.security.web.server.SecurityWebFilterChain;
+
+import io.jsonwebtoken.io.Decoders;
+
+@Configuration
+@EnableWebFluxSecurity // Enable WebFlux Security (required for Spring Cloud Gateway)
+public class SecurityConfig {
+	  @Value("${jwt.secret}")
+	    private String jwtSecret;
+
+    @Bean
+    public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
+        http
+            .authorizeExchange(exchanges -> exchanges
+                // Allow access to Swagger UI and related resources without authentication
+                .pathMatchers("/swagger-ui/**", "/swagger-resources/**", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-config/**", "/api-docs/**").permitAll()
+                // Allow access to actuator health endpoint
+                .pathMatchers("/actuator/health/**").permitAll()
+                 // Allow access to the authentication service endpoints for login/registration/token refresh/jwks
+                .pathMatchers("/auth-service/api/v1/auth/**").permitAll()
+                .pathMatchers("/auth-service/api/v1/admin/**").permitAll()
+                .pathMatchers(HttpMethod.GET, "/movie-catalog-service/api/v1/movies/**").permitAll()
+                .pathMatchers(HttpMethod.GET, "/movie-catalog-service/api/v1/theaters/**").permitAll()
+                .pathMatchers(HttpMethod.GET, "/movie-catalog-service/api/v1/showtimes/search").permitAll()
+                .pathMatchers(HttpMethod.GET, "/movie-catalog-service/api/v1/showtimes/movie/**").permitAll()
+                .pathMatchers(HttpMethod.GET, "/movie-catalog-service/api/v1/showtimes/{id}").permitAll()
+                // Use service ID prefix if discovery locator is used
+                // .pathMatchers("/api/v1/auth/**", "/oauth2/jwks").permitAll() // Or use path if explicit routes are defined without service ID prefix
+                // All other requests require authentication
+                .anyExchange().authenticated()
+            )
+            // Configure OAuth2 Resource Server for JWT validation
+            .oauth2ResourceServer(oauth2 -> oauth2
+                .jwt(Customizer.withDefaults()) // Use default JWT validation configuration (fetches JWK Set URI from application properties)
+            )
+            // Disable CSRF as we are using stateless JWT authentication
+            .csrf(ServerHttpSecurity.CsrfSpec::disable);
+
+        return http.build();
+    }
+    
+    @Bean
+    public ReactiveJwtDecoder reactiveJwtDecoder() {
+        // Decode the Base64 secret string into bytes
+        byte[] keyBytes = Decoders.BASE64.decode(this.jwtSecret);
+        // Create a SecretKey suitable for the HMAC algorithm used (HS256)
+        SecretKey key = new SecretKeySpec(keyBytes, 0, keyBytes.length, "HmacSHA256");
+
+        // Configure the ReactiveJwtDecoder to use the symmetric secret key
+        // Use NimbusReactiveJwtDecoder for reactive environments
+        return NimbusReactiveJwtDecoder.withSecretKey(key).build();
+    }
+}

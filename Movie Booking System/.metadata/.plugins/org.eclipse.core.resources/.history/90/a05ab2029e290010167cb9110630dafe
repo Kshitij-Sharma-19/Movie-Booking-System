@@ -1,0 +1,5 @@
+package com.movie.auth.repository;
+
+public interface UserRepository {
+
+}

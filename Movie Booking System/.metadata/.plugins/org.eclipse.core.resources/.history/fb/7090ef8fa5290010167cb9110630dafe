@@ -1,0 +1,148 @@
+package com.movie.booking.exception;
+
+import feign.FeignException;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import jakarta.ws.rs.ServiceUnavailableException;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
+
+
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
+
+@RestControllerAdvice
+@Slf4j
+public class GlobalExceptionHandler {
+
+    // Handle specific ResourceNotFoundException
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ErrorDetails> handleResourceNotFoundException(ResourceNotFoundException ex, WebRequest request) {
+        ErrorDetails errorDetails = new ErrorDetails(LocalDateTime.now(), ex.getMessage(), request.getDescription(false));
+        log.warn("Resource not found: {}", ex.getMessage());
+        return new ResponseEntity<>(errorDetails, HttpStatus.NOT_FOUND);
+    }
+
+    // Handle custom BookingException
+    @ExceptionHandler(BookingException.class)
+    public ResponseEntity<ErrorDetails> handleBookingException(BookingException ex, WebRequest request) {
+        ErrorDetails errorDetails = new ErrorDetails(LocalDateTime.now(), ex.getMessage(), request.getDescription(false));
+        // Log as warning or error based on severity?
+        log.warn("Booking Exception (Booking ID: {}): {}", ex.getBookingId(), ex.getMessage());
+        // Usually a Bad Request (400) or Conflict (409), but could be Internal Server Error (500) for critical failures
+        HttpStatus status = HttpStatus.BAD_REQUEST; // Default
+         if (ex.getMessage().contains("Could not reserve seats after successful payment")) {
+             status = HttpStatus.INTERNAL_SERVER_ERROR; // Indicate a more severe issue
+             log.error("CRITICAL Booking Exception (Booking ID: {}): {}", ex.getBookingId(), ex.getMessage());
+         } else if (ex.getMessage().contains("unavailable")) {
+              status = HttpStatus.SERVICE_UNAVAILABLE; // 503 if due to dependency
+         }
+        return new ResponseEntity<>(errorDetails, status);
+    }
+
+    // Handle validation errors from @Valid
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, Object>> handleValidationExceptions(MethodArgumentNotValidException ex, WebRequest request) {
+        Map<String, String> errors = new HashMap<>();
+        ex.getBindingResult().getAllErrors().forEach((error) -> {
+            String fieldName = ((FieldError) error).getField();
+            String errorMessage = error.getDefaultMessage();
+            errors.put(fieldName, errorMessage);
+        });
+        log.warn("Validation failed: {}", errors);
+        Map<String, Object> responseBody = createErrorResponseMap(HttpStatus.BAD_REQUEST, "Validation Failed", errors, request);
+        return new ResponseEntity<>(responseBody, HttpStatus.BAD_REQUEST);
+    }
+
+     // Handle Feign specific errors (including 404 from downstream)
+    @ExceptionHandler(FeignException.class)
+    public ResponseEntity<ErrorDetails> handleFeignStatusException(FeignException ex, WebRequest request) {
+        HttpStatus status = HttpStatus.resolve(ex.status());
+        if (status == null) {
+            status = HttpStatus.INTERNAL_SERVER_ERROR; // Default if status code is invalid
+        }
+        String message = "Error communicating with a downstream service.";
+         if (status == HttpStatus.NOT_FOUND) {
+             message = "Required resource not found in downstream service.";
+             log.warn("Feign client returned 404 for request {}", request.getDescription(false));
+             status = HttpStatus.BAD_REQUEST; // Treat downstream 404 as Bad Request from client's perspective? Or keep 404? Let's use 400.
+         } else if (status.is5xxServerError()) {
+              message = "Downstream service reported an internal error.";
+              log.error("Feign client returned 5xx error ({}) for request {}", status.value(), request.getDescription(false));
+              status = HttpStatus.SERVICE_UNAVAILABLE; // Treat downstream 5xx as 503
+         } else {
+             log.warn("Feign client returned status {} for request {}: {}", status.value(), request.getDescription(false), ex.getMessage());
+         }
+
+        ErrorDetails errorDetails = new ErrorDetails(LocalDateTime.now(), message, request.getDescription(false));
+        return new ResponseEntity<>(errorDetails, status);
+    }
+
+    // Handle Circuit Breaker open exceptions
+    @ExceptionHandler({CallNotPermittedException.class, ServiceUnavailableException.class}) // Add fallback exceptions here
+    public ResponseEntity<ErrorDetails> handleCircuitBreakerOpenException(Exception ex, WebRequest request) {
+        ErrorDetails errorDetails = new ErrorDetails(
+                LocalDateTime.now(),
+                "Service temporarily unavailable due to high load or maintenance. Please try again later.",
+                request.getDescription(false));
+        log.error("Circuit breaker open or service fallback triggered for request {}: {}", request.getDescription(false), ex.getMessage());
+        return new ResponseEntity<>(errorDetails, HttpStatus.SERVICE_UNAVAILABLE); // 503
+    }
+
+
+     // Handle security access denied errors
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorDetails> handleAccessDeniedException(AccessDeniedException ex, WebRequest request) {
+        ErrorDetails errorDetails = new ErrorDetails(
+                LocalDateTime.now(),
+                "Access Denied: You do not have permission to perform this action.",
+                request.getDescription(false));
+        log.warn("Access denied for request {}: {}", request.getDescription(false), ex.getMessage());
+        return new ResponseEntity<>(errorDetails, HttpStatus.FORBIDDEN);
+    }
+
+
+    // Handle any other exceptions
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorDetails> handleGlobalException(Exception ex, WebRequest request) {
+        ErrorDetails errorDetails = new ErrorDetails(LocalDateTime.now(), "An internal server error occurred.", request.getDescription(false));
+        log.error("Unhandled exception for request {}:", request.getDescription(false), ex);
+        return new ResponseEntity<>(errorDetails, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+
+    // Helper to create consistent error map for validation errors
+    private Map<String, Object> createErrorResponseMap(HttpStatus status, String error, Map<String, String> messages, WebRequest request) {
+        Map<String, Object> responseBody = new HashMap<>();
+        responseBody.put("timestamp", LocalDateTime.now());
+        responseBody.put("status", status.value());
+        responseBody.put("error", error);
+        responseBody.put("messages", messages);
+        responseBody.put("path", request.getDescription(false));
+        return responseBody;
+    }
+
+    // Simple ErrorDetails class
+    static class ErrorDetails {
+        private LocalDateTime timestamp;
+        private String message;
+        private String details;
+        // Constructor & Getters ... (same as before)
+
+        public ErrorDetails(LocalDateTime timestamp, String message, String details) {
+            this.timestamp = timestamp;
+            this.message = message;
+            this.details = details;
+        }
+        public LocalDateTime getTimestamp() { return timestamp; }
+        public String getMessage() { return message; }
+        public String getDetails() { return details; }
+    }
+}

@@ -1,0 +1,5 @@
+package com.movie.auth.controller;
+
+public class AdminController {
+
+}
