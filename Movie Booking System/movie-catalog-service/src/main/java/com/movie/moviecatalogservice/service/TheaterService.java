@@ -28,6 +28,7 @@ public class TheaterService {
                 .city(theater.getCity())
                 .address(theater.getAddress())
                 .totalSeats(theater.getTotalSeats())
+                .numberOfScreens(theater.getNumberOfScreens()) // Map new field
                 .build();
     }
 
@@ -37,6 +38,7 @@ public class TheaterService {
                 .city(theaterDto.getCity())
                 .address(theaterDto.getAddress())
                 .totalSeats(theaterDto.getTotalSeats())
+                .numberOfScreens(theaterDto.getNumberOfScreens()) // Map new field
                 .build();
     }
 
@@ -78,6 +80,7 @@ public class TheaterService {
         existingTheater.setCity(theaterDto.getCity());
         existingTheater.setAddress(theaterDto.getAddress());
         existingTheater.setTotalSeats(theaterDto.getTotalSeats());
+        existingTheater.setNumberOfScreens(theaterDto.getNumberOfScreens()); // Update new field
 
         Theater updatedTheater = theaterRepository.save(existingTheater);
         log.info("Theater updated successfully for id: {}", id);
