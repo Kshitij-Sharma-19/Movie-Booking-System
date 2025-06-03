@@ -1,5 +1,0 @@
-package com.movie.auth.dto;
-
-public class JwtAuthenticationResponse {
-
-}

@@ -1,5 +1,0 @@
-package com.movie.moviecatalogservice.controller;
-
-public class ShowtimeController {
-
-}
