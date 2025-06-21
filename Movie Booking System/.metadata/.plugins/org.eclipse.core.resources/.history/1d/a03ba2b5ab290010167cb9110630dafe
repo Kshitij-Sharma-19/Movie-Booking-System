@@ -1,5 +1,0 @@
-package com.movie.payment.dto;
-
-public class PaymentRequestDto {
-
-}

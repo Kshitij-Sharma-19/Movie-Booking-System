@@ -1,0 +1,126 @@
+
+  /* background-image: url('https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=870&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'); */
+  /* background-image: url('https://img.freepik.com/premium-vector/cinema-background-with-film-reel-popcorn-drink-tickets_259139-1225.jpg'); */
+  /* background-image: url('https://media.gettyimages.com/id/2150652309/video/loopable-3d-animation-of-classic-movie-night-essentials-with-clapperboard-popcorn-and-film.jpg?s=640x640&k=20&c=HltjQAk8K8tO1q1W3kgDdKi9W3Mc3M5n20XqDIJLzCA='); */
+ 
+
+:root {
+  font-family: "Segoe UI", Roboto, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.6;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.9);
+  background-color: #1f1f1f;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  font-weight: 600;
+  color: #ffea00;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+a:hover {
+  color: #DA1212;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  font-weight: 600;
+  background-color: #ffffff;
+  /* background-image: url('https://img.freepik.com/premium-vector/cinema-background-with-film-reel-popcorn-drink-tickets_259139-1225.jpg');
+  background-size: cover; */
+  background-image: url('./assets/background/background.jpg');
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-position-y: bottom;
+  background-size: 100% 80%;
+  color: #ffffff;
+}
+
+h1 {
+  font-size: 3.5em;
+  line-height: 1.2;
+  margin-bottom: 0.5em;
+  color: #ffffff;
+}
+
+button {
+  border-radius: 10px;
+  border: none;
+  padding: 0.75em 1.5em;
+  font-size: 1.1em;
+  font-weight: 600;
+  font-family: inherit;
+  background-color: #adc1e9;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+button:hover {
+  background-color: #ffffff;
+  transform: scale(1.05);
+}
+
+
+button:focus,
+button:focus-visible {
+  outline: 3px dashed #04dfdf;
+  outline-offset: 4px;
+}
+
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #1f1f1f;
+    background-color: #ffffff;
+  }
+
+  a {
+    color: #000bbd;
+  }
+
+  a:hover {
+    color: #d61c00;
+  }
+
+  button {
+    background-color: #eeeeee;
+    color: #1f1f1f;
+  }
+}
+
+.frosted-glass {
+  background-color: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 1.5em;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #000;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  max-width: 800px;
+  margin: auto;
+}
+
+.translucent-text-container {
+  background-color: rgba(242, 255, 0, 0.5);
+  padding: 1.2em;
+  border-radius: 12px;
+  color: #000000;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  opacity:1;
+  text-align: center;
+  align-items: center;
+  flex-direction: width;
+}

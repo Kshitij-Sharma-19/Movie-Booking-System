@@ -1,5 +1,0 @@
-package com.movie.auth.config;
-
-public class JwtProperties {
-
-}

@@ -1,5 +1,0 @@
-package com.movie.booking.repository;
-
-public interface ShowtimeSeatRepository {
-
-}
