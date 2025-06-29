@@ -136,4 +136,22 @@ public class BookingController {
         String resultMessage = bookingService.initializeSeatsForShowtime(showtimeId, requestDto);
         return ResponseEntity.ok(resultMessage);
     }
+    
+    @DeleteMapping("/admin/showtimes/{showtimeId}/deinitialize-seats")
+    @Operation(summary = "De-initialize seats for a showtime (Admin)",
+               description = "Deletes all seat records for a given showtime. Use with caution, only for admin use.",
+               responses = {
+                   @ApiResponse(responseCode = "200", description = "Seats deleted successfully"),
+                   @ApiResponse(responseCode = "400", description = "Invalid request parameters"),
+               })
+    public ResponseEntity<String> deinitializeSeatsForShowtime(@PathVariable Long showtimeId) {
+        String result = bookingService.deinitializeSeatsForShowtime(showtimeId);
+        return ResponseEntity.ok(result);
+    }
+    
+    @PostMapping("bookings/{id}/confirm")
+    public ResponseEntity<Void> confirmBooking(@PathVariable Long id) {
+        bookingService.confirmBooking(id);
+        return ResponseEntity.ok().build();
+    }
 }

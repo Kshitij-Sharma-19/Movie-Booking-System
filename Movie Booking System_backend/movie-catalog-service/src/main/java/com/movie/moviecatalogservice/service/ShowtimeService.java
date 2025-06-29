@@ -144,12 +144,29 @@ public class ShowtimeService {
                 .collect(Collectors.toList());
     }
 
+//    public List<ShowtimeDto> getShowtimesByNameCityAndDate(String name, String city, LocalDate date) {
+//        log.info("Searching for movies with name: {}, city: {}, date: {}", name, city, date);
+//        LocalDateTime startOfDay = date.atStartOfDay();
+//        LocalDateTime endOfDay = date.plusDays(1).atStartOfDay();
+//
+//        List<Showtime> movies = showtimeRepository.findShowtimesByMovieTitleCityAndDate(name, city, startOfDay, endOfDay);
+//
+//        return movies.stream()
+//                     .map(this::convertToDto)
+//                     .collect(Collectors.toList());
+//    }
     public List<ShowtimeDto> getShowtimesByNameCityAndDate(String name, String city, LocalDate date) {
         log.info("Searching for movies with name: {}, city: {}, date: {}", name, city, date);
         LocalDateTime startOfDay = date.atStartOfDay();
         LocalDateTime endOfDay = date.plusDays(1).atStartOfDay();
 
-        List<Showtime> movies = showtimeRepository.findShowtimesByMovieTitleCityAndDate(name, city, startOfDay, endOfDay);
+        // Take only the first word for matching
+        String[] words = name.trim().split("\\s+");
+        String firstKeyword = words[0];
+
+        // Use the existing repository method
+        List<Showtime> movies = showtimeRepository.findShowtimesByMovieTitleCityAndDate(
+            firstKeyword, city, startOfDay, endOfDay);
 
         return movies.stream()
                      .map(this::convertToDto)

@@ -9,7 +9,9 @@ import {
   Button,
   Alert,
 } from "@mui/material";
-import { getUserProfile, updateUserProfile } from "../../services/userService";
+import { getUserProfile, updateUserProfile, createUserProfile } from "../../services/userService";
+import { useNavigate } from "react-router-dom";
+
 
 const UserProfile = () => {
   const [profile, setProfile] = useState(null);
@@ -17,20 +19,35 @@ const UserProfile = () => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [editMode, setEditMode] = useState(false);
-
+  const navigate = useNavigate();
   useEffect(() => {
+    
     const fetchProfile = async () => {
       try {
         const res = await getUserProfile();
         setProfile(res.data);
       } catch (error) {
-        console.error("Failed to fetch user profile:", error);
-      } finally {
-        setLoading(false);
+        console.error("User not found. Creating new profile...");
+      try {
+        const defaultProfile = {
+          firstName: "User",
+          lastName: "",
+          email: "abc@xyz.com",        // Optional if backend infers from JWT
+          phoneNumber: "",
+          dateOfBirth: "",
+          address: ""
+        };
+        const created = await createUserProfile(defaultProfile);
+        setProfile(created.data);
+      } catch (createErr) {
+        console.error("Failed to create profile:", createErr);
       }
-    };
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchProfile();
+  fetchProfile();
   }, []);
 
   const handleChange = (e) => {
@@ -73,6 +90,7 @@ const UserProfile = () => {
   }
 
   return (
+    
     <Box p={4}>
       <Paper elevation={3} sx={{ p: 4, maxWidth: 600, margin: "auto" }}>
         <Typography variant="h4" gutterBottom>User Profile</Typography>
@@ -170,6 +188,25 @@ const UserProfile = () => {
             {saving ? "Saving..." : "Save Changes"}
           </Button>
         </Box>
+
+        <Box mt={4}>
+  <Paper
+    elevation={2}
+    sx={{
+      p: 2,
+      textAlign: "center",
+      backgroundColor: "#e3f2fd",
+      cursor: "pointer",
+      transition: "0.3s",
+      "&:hover": {
+        backgroundColor: "#bbdefb",
+      },
+    }}
+    onClick={() =>  navigate("/profile/bookings", { state: { firstName: profile.firstName } })}
+  >
+    <Typography variant="h6">View Booking History</Typography>
+  </Paper>
+</Box>
       </Paper>
     </Box>
   );

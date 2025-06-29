@@ -35,11 +35,17 @@ public class PaymentController {
     @ApiResponse(responseCode = "403", description = "Forbidden")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<PaymentResponseDto> processPayment(@Valid @RequestBody PaymentRequestDto request) {
-        PaymentResponseDto response = paymentService.processPayment(request);
+        PaymentResponseDto response = paymentService.createStripeCheckoutSession(request);
         // Consider returning different HTTP status codes based on response.getStatus()
         // For example, HttpStatus.ACCEPTED for PENDING, HttpStatus.BAD_REQUEST for FAILED if it's a client error.
         // However, returning 200 OK and indicating status in the body is also common.
         return ResponseEntity.ok(response);
+    }
+    
+    @PostMapping("/checkout-session")
+    public ResponseEntity<PaymentResponseDto> createCheckoutSession(@RequestBody PaymentRequestDto req) {
+        PaymentResponseDto resp = paymentService.createStripeCheckoutSession(req);
+        return ResponseEntity.ok(resp);
     }
 
     // TODO: Add refund endpoint if needed, calling StripePaymentService.processRefund(...)

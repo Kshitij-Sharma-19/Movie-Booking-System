@@ -34,10 +34,12 @@ public class SecurityConfig {
                 // Permit access to authentication endpoints, swagger, actuator health, and JWK Set endpoint
                 .requestMatchers("/api/v1/auth/**",
                 				"/api/v1/admin/**",
-                                 "/swagger-ui/**",
-                                 "/v3/api-docs/**",
-                                 "/swagger-resources/**",
-                                 "/webjars/**",
+                				 "/v3/api-docs",
+                				 "/auth-service/api-docs",
+                				    "/swagger-ui.html",
+                				    "/swagger-ui/**",
+                				    "/swagger-resources/**",
+                				    "/webjars/**",
                                  "/api-docs/**",
                                  "/actuator/health").permitAll()
                 // Secure any other endpoints (if any are added to this service later)

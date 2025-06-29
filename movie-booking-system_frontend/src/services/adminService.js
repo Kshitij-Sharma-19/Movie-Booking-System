@@ -11,4 +11,11 @@ export const getAllTheaters = () =>
   axiosInstance.get(`${BASE_URL}/movie-catalog-service/api/v1/theaters`);
 
 export const createTheater = (data) =>
-  axiosInstance.post(`${BASE_URL}/movie-catalog-service/api/v1/admin/theaters`, data);
+  axiosInstance.post(`${BASE_URL}/movie-catalog-service/api/v1/theaters`, data);
+
+
+export const updateTheater = (id, updateTheater) =>
+  axiosInstance.put(`${BASE_URL}/movie-catalog-service/api/v1/theaters/${id}`, updateTheater);
+
+export const deleteTheater = (id) =>
+  axiosInstance.delete(`${BASE_URL}/movie-catalog-service/api/v1/theaters/${id}`);

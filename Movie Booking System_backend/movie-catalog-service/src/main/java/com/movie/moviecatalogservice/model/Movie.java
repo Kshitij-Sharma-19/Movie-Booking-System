@@ -43,6 +43,8 @@ public class Movie {
     private String castMembers; // Simple comma-separated string, or use a separate entity/collection
 
     private String posterUrl;
+    
+    private String trailerYoutubeId;
 
     // Example relationship: A movie can have many showtimes
     // @OneToMany(mappedBy = "movie", cascade = CascadeType.ALL, orphanRemoval = true)

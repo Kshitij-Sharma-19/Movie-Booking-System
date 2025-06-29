@@ -20,6 +20,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter; // Import
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter; // Import
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.security.core.GrantedAuthority; // Import if not already there
 import org.springframework.security.core.authority.SimpleGrantedAuthority; // Import if not already there
 
@@ -37,13 +38,19 @@ import java.util.stream.Stream; // Import if not already there
 @EnableMethodSecurity(prePostEnabled = true) // Enable @PreAuthorize annotations
 public class SecurityConfig {
 
+//    private final WebMvcConfigurer corsConfigurer;
+
 	@Value("${jwt.secret}")
 	private String jwtSecret;
+
+//    SecurityConfig(WebMvcConfigurer corsConfigurer) {
+//        this.corsConfigurer = corsConfigurer;
+//    }
 	   
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(AbstractHttpConfigurer::disable) 
+            .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) 
             .authorizeHttpRequests(authz -> authz
                 .requestMatchers(HttpMethod.GET,

@@ -11,6 +11,7 @@ import com.movie.moviecatalogservice.model.Movie;
 import com.movie.moviecatalogservice.repository.MovieRepository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,6 +35,7 @@ public class MovieService {
                 .director(movie.getDirector())
                 .castMembers(movie.getCastMembers())
                 .posterUrl(movie.getPosterUrl())
+                .trailerYoutubeId(movie.getTrailerYoutubeId())
                 .build();
     }
 
@@ -48,6 +50,7 @@ public class MovieService {
                 .director(movieDto.getDirector())
                 .castMembers(movieDto.getCastMembers())
                 .posterUrl(movieDto.getPosterUrl())
+                .trailerYoutubeId(movieDto.getTrailerYoutubeId())
                 .build();
     }
     // --- End Mapping Logic ---
@@ -67,11 +70,24 @@ public class MovieService {
         return convertToDto(movie);
     }
 
-     public MovieDto getMovieByTitle(String title) {
+//     public MovieDto getMovieByTitle(String title) {
+//        log.info("Fetching movie by title: {}", title);
+//        Movie movie = movieRepository.findByTitleIgnoreCase(title)
+//                .orElseThrow(() -> new ResourceNotFoundException("Movie", "title", title));
+//        return convertToDto(movie);
+//    }
+    public MovieDto getMovieByTitle(String title) {
         log.info("Fetching movie by title: {}", title);
-        Movie movie = movieRepository.findByTitleIgnoreCase(title)
-                .orElseThrow(() -> new ResourceNotFoundException("Movie", "title", title));
-        return convertToDto(movie);
+        // Try exact match first
+        Optional<Movie> exact = movieRepository.findByTitleIgnoreCase(title.trim());
+        if (exact.isPresent()) return convertToDto(exact.get());
+
+        // Fallback: search by first word
+        String firstWord = title.trim().split("\\s+")[0];
+        Optional<Movie> fallback = movieRepository.findFirstByTitleIgnoreCaseContaining(firstWord);
+        return fallback
+            .map(this::convertToDto)
+            .orElseThrow(() -> new ResourceNotFoundException("Movie", "title or keyword", title));
     }
 
 
@@ -106,7 +122,7 @@ public class MovieService {
         existingMovie.setDirector(movieDto.getDirector());
         existingMovie.setCastMembers(movieDto.getCastMembers());
         existingMovie.setPosterUrl(movieDto.getPosterUrl());
-
+        existingMovie.setTrailerYoutubeId(movieDto.getTrailerYoutubeId());
         Movie updatedMovie = movieRepository.save(existingMovie);
         log.info("Movie updated successfully for id: {}", id);
         return convertToDto(updatedMovie);

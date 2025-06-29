@@ -9,3 +9,7 @@ export const getUserProfile = () => {
 export const updateUserProfile = (updatedData) => {
   return axiosInstance.put(`${BASE_URL}/user-service/api/v1/users/me`, updatedData);
 };
+
+export const createUserProfile = (newProfileData) => {
+  return axiosInstance.post(`${BASE_URL}/user-service/api/v1/users/me`, newProfileData);
+};

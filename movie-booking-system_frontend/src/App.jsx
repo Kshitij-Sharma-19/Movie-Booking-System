@@ -11,9 +11,8 @@ import ProtectedRoute from "./components/common/ProtectedRoute.jsx";
 import SeatSelector from "./components/booking/SeatSelector";
 import BookingSummary from "./components/booking/BookingSummary";
 import BookingConfirmation from "./components/booking/BookingConfirmation";
-import StripeCheckout from "./components/payment/StripeCheckout";
-import PaymentSuccess from "./pages/PaymentSuccess";
-import PaymentCancel from "./pages/PaymentCancel";
+import PaymentSuccess from "./components/payment/PaymentSuccess";
+import PaymentCancel from "./components/payment/PaymentCancel.jsx";
 import TheaterManagement from "./components/admin/TheaterManagement";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import MovieManagement from "./components/admin/MovieManagement";
@@ -21,12 +20,16 @@ import UserManagement from "./components/admin/UserManagement";
 import BookingManagement from "./components/admin/BookingManagement";
 import UserProfile from "./components/user/UserProfile.jsx";
 import ShowtimeManagement from "./components/admin/ShowtimeManagement.jsx";
-
+import BookingHistory from "./components/booking/BookingHistory.jsx";
+import AboutUs from "./pages/AboutUs.jsx";
+import ContactUs from "./pages/ContactUs";
 function App() {
   return (
     <Layout >
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/about" element={<AboutUs />} />
+        <Route path="/contact" element={<ContactUs />} />
         <Route path="/movies" element={<Movies />} />
         <Route path="/movies/:id" element={<MovieDetail />} />
         <Route path="/login" element={<Login />} />
@@ -35,7 +38,6 @@ function App() {
         <Route path="/booking/seats" element={<ProtectedRoute><SeatSelector /></ProtectedRoute>} />
         <Route path="/booking/summary" element={<ProtectedRoute><BookingSummary /></ProtectedRoute>} />
         <Route path="/booking/confirmed" element={<ProtectedRoute><BookingConfirmation /></ProtectedRoute>} />
-        <Route path="/payment" element={<ProtectedRoute><StripeCheckout /></ProtectedRoute>} />
         <Route path="/payment/success" element={<PaymentSuccess />} />
         <Route path="/payment/cancel" element={<PaymentCancel />} />
         <Route path="/admin/dashboard" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
@@ -45,6 +47,7 @@ function App() {
         <Route path="/admin/theaters" element={<ProtectedRoute><TheaterManagement /></ProtectedRoute>} />
         <Route path="/admin/showtimes" element={<ProtectedRoute><ShowtimeManagement /></ProtectedRoute>} />
         <Route path="/user/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+        <Route path="/profile/bookings" element={<ProtectedRoute><BookingHistory /></ProtectedRoute>} />
       </Routes>
     </Layout>
   );

@@ -121,34 +121,4 @@ public class ShowtimeController {
         showtimeService.deleteShowtime(id);
     }
 
-    // --- Internal Endpoints (Potentially called by Booking Service) ---
-    // These might need different security (e.g., service-to-service auth) or could be part of the Admin API
-
-    @PatchMapping("/{id}/decreaseSeats")
-    @PreAuthorize("hasRole('ADMIN') or isAuthenticated()") // Example security
-    @Operation(summary = "[Internal/Admin] Decrease available seats", description = "Decreases the available seats for a showtime. Requires ADMIN role or internal service scope.",
-               security = @SecurityRequirement(name = "bearerAuth"))
-    @ApiResponse(responseCode = "200", description = "Seats decreased successfully")
-    @ApiResponse(responseCode = "400", description = "Not enough seats available")
-    @ApiResponse(responseCode = "404", description = "Showtime not found")
-    public ResponseEntity<Void> decreaseSeats(
-            @PathVariable Long id,
-            @Parameter(description = "Number of seats to decrease", required = true) @RequestParam int count) {
-        showtimeService.decreaseAvailableSeats(id, count);
-        return ResponseEntity.ok().build();
-    }
-
-     @PatchMapping("/{id}/increaseSeats")
-    @PreAuthorize("hasRole('ADMIN') or isAuthenticated()") // Example security
-    @Operation(summary = "[Internal/Admin] Increase available seats", description = "Increases the available seats for a showtime (e.g., cancellation). Requires ADMIN role or internal service scope.",
-               security = @SecurityRequirement(name = "bearerAuth"))
-    @ApiResponse(responseCode = "200", description = "Seats increased successfully")
-    @ApiResponse(responseCode = "404", description = "Showtime not found")
-    public ResponseEntity<Void> increaseSeats(
-            @PathVariable Long id,
-            @Parameter(description = "Number of seats to increase", required = true) @RequestParam int count) {
-        showtimeService.increaseAvailableSeats(id, count);
-        return ResponseEntity.ok().build();
-    }
-
 }

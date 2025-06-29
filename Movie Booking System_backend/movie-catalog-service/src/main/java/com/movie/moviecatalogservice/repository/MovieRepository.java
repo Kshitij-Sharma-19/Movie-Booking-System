@@ -17,6 +17,8 @@ public interface MovieRepository extends JpaRepository<Movie, Long> {
 
     // Find movie by title (case-insensitive)
     Optional<Movie> findByTitleIgnoreCase(String title);
+    
+    Optional<Movie> findFirstByTitleIgnoreCaseContaining(String keyword);
 
     // Check if a movie exists by title (case-insensitive)
     boolean existsByTitleIgnoreCase(String title);

@@ -1,34 +1,34 @@
 package com.movie.booking.util;
 
+import com.movie.booking.model.Booking;
+import com.movie.booking.repository.BookingRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
 public class UserEmailResolver {
 
+    private final BookingRepository bookingRepository;
+    // If you have a UserRepository, inject it as well and fetch email by userId
 
     /**
-     * Tries to get user email from JWT claims.
+     * Gets the userId from booking, then fetches email from user service/db
      */
-    public String resolveUserEmail() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getPrincipal() instanceof Jwt) {
-            Jwt jwt = (Jwt) authentication.getPrincipal();
-            Object emailObj = jwt.getClaims().get("sub");
-            if (emailObj != null) {
-                return emailObj.toString();
-            }
-//            // fallback to sub/username if your JWT contains it, or fetch from auth service
-//            Object userId = jwt.getClaims().get("sub");
-//            if (userId != null) {
-//                return authServiceClient.getUserEmailById(userId.toString());
-//            }
-        }
-        // As a last fallback, you may throw or return null
-        throw new IllegalStateException("Unable to resolve user email from token or auth service");
+    public String resolveUserEmailByBookingId(Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+            .orElseThrow(() -> new IllegalArgumentException("Booking not found: " + bookingId));
+        String userId = booking.getUserId();
+
+        // If you store email directly in the booking entity, return it:
+        // return booking.getUserEmail();
+
+        // If you have a user repository/service, look up email by userId:
+        // return userRepository.findById(userId).map(User::getEmail).orElseThrow(...);
+
+        // If userId is an email, just return:
+        return userId;
+
+        // If userId is a foreign key, look up in your user database/service and return email.
     }
 }

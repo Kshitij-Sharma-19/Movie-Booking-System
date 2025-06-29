@@ -4,9 +4,9 @@ import ProtectedRoute from "./ProtectedRoute";
 import SeatSelector from "../components/booking/SeatSelector.jsx";
 import BookingSummary from "../components/booking/BookingSummary";
 import BookingConfirmation from "../components/booking/BookingConfirmation";
-import StripeCheckout from "../components/payment/StripeCheckout";
+// import StripeCheckout from "../components/payment/StripeCheckout";
 import PaymentSuccess from "../components/payment/PaymentSuccess";
-import PaymentCancel from "../components/payment/PaymentCancel";
+import PaymentCancel from "../components/payment/PaymentCancel.jsx/index.js";
 
 const Booking = () => {
   return (
@@ -35,14 +35,14 @@ const Booking = () => {
           </ProtectedRoute>
         }
       />
-      <Route
+      {/* <Route
         path="/payment"
         element={
           <ProtectedRoute>
-            <StripeCheckout />
+            <StripeCheckout
           </ProtectedRoute>
         }
-      />
+      /> */}
       <Route path="/payment/success" element={<PaymentSuccess />} />
       <Route path="/payment/cancel" element={<PaymentCancel />} />
     </Routes>

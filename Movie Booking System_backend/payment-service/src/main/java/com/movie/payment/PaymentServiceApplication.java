@@ -11,7 +11,7 @@ import io.swagger.v3.oas.annotations.security.SecurityScheme;
 
 @SpringBootApplication
 @EnableDiscoveryClient
-@OpenAPIDefinition(info = @Info(title = "Payment API", version = "1.0", description = "API for Processing Payments (Simulated)"))
+@OpenAPIDefinition(info = @Info(title = "Payment API", version = "1.0", description = "API for Processing Payments (through Stripe Checkout)"))
 @SecurityScheme( // Define security scheme for Swagger UI
     name = "bearerAuth",
     type = SecuritySchemeType.HTTP,

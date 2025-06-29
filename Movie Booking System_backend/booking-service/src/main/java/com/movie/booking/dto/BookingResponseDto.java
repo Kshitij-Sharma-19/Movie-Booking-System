@@ -32,4 +32,6 @@ public class BookingResponseDto {
     private String movieTitle;
     private String theaterName;
     private LocalDateTime showtimeDateTime;
+    
+    private String redirectUrl;
 }

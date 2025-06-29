@@ -30,4 +30,5 @@ public class MovieDto {
     private String director;
     private String castMembers;
     private String posterUrl;
+    private String trailerYoutubeId;
 }

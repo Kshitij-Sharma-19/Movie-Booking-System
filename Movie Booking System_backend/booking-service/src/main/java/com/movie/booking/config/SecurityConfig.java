@@ -1,6 +1,6 @@
 package com.movie.booking.config;
 
-import javax.crypto.SecretKey;
+import javax.crypto.SecretKey; 
 import javax.crypto.spec.SecretKeySpec;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -38,6 +38,8 @@ public class SecurityConfig {
                                  "/webjars/**",
                                  "/api-docs/**",
                                  "/actuator/health").permitAll()
+                .requestMatchers("/api/v1/bookings/*/confirm").permitAll()
+                .requestMatchers("/api/email/send").permitAll()
                  // All other requests under /api/v1/bookings require authentication
                 .requestMatchers("/api/v1/bookings/**").authenticated()
                 // Secure any other potential endpoints

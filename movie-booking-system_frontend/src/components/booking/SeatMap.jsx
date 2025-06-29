@@ -18,19 +18,20 @@ const SeatMap = ({
 
   return (
     <Box
-      sx={{
-        p: 4,
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        flexDirection: "column",
-        minHeight: "100vh",
-        bgcolor: "#f4f6fa",
-        // width: "50%",                 // FULL viewport width
-        maxWidth: "1800px",             // or whatever max you want
-        margin: "0 auto",
-        boxSizing: "border-box",
-      }}
+       sx={{
+    p: 4,
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    flexDirection: "column",
+    minHeight: "100vh",
+    bgcolor: "#f4f6fa",
+    width: "100%",
+    maxWidth: "1800px",
+    margin: "0 auto",
+    boxSizing: "border-box",
+    overflowX: "auto", // Important for responsive view
+  }}
     >
       {movieName && (
         <>
@@ -43,8 +44,23 @@ const SeatMap = ({
         </>
       )}
 
+<Box mt={3} display="flex" justifyContent="center" gap={4}>
+  <Box display="flex" alignItems="center" gap={1}>
+    <Box sx={{ width: 20, height: 20, bgcolor: "#43a047", borderRadius: 1, border: "1px solid #1b5e20" }} />
+    <Typography variant="body2">Available</Typography>
+  </Box>
+  <Box display="flex" alignItems="center" gap={1}>
+    <Box sx={{ width: 20, height: 20, bgcolor: "#ffd166", borderRadius: 1, border: "1px solid #ffae00" }} />
+    <Typography variant="body2">Selected</Typography>
+  </Box>
+  <Box display="flex" alignItems="center" gap={1}>
+    <Box sx={{ width: 20, height: 20, bgcolor: "#b0bec5", borderRadius: 1, border: "1px solid #78909c" }} />
+    <Typography variant="body2">Booked</Typography>
+  </Box>
+</Box>
+<br/>
       {/* Wider fixed seat grid container */}
-      <Box sx={{ width: "100%", maxWidth: "1200px" }}>
+      <Box sx={{ width: "80%" }}>
         <SeatGrid
           seats={seats}
           selectedSeats={selectedSeats}

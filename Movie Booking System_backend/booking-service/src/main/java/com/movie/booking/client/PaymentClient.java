@@ -17,14 +17,18 @@ import com.movie.booking.dto.PaymentResponseDto;
 public interface PaymentClient {
 
     // Define the endpoint expected on the Payment Service
-    @PostMapping("/api/v1/payments/process") // Example endpoint
-    @CircuitBreaker(name = "payment-service")
-    // Retry might be risky for payments unless the payment service handles idempotency well
-    ResponseEntity<PaymentResponseDto> processPayment(@RequestBody PaymentRequestDto paymentRequest);
+//    @PostMapping("/api/v1/payments/process") // Example endpoint
+//    @CircuitBreaker(name = "payment-service")
+//    // Retry might be risky for payments unless the payment service handles idempotency well
+//    ResponseEntity<PaymentResponseDto> processPayment(@RequestBody PaymentRequestDto paymentRequest);
 
     // TODO: Define refund endpoint if cancellation is implemented
     // @PostMapping("/api/v1/payments/refund")
     // ResponseEntity<PaymentResponseDto> refundPayment(@RequestBody RefundRequestDto refundRequest);
+
+	@PostMapping("/api/v1/payments/checkout-session")
+	 @CircuitBreaker(name = "payment-service")
+    ResponseEntity<PaymentResponseDto> createCheckoutSession(@RequestBody PaymentRequestDto paymentRequest);
 
     // --- Fallback Implementation ---
     @Component
@@ -32,7 +36,7 @@ public interface PaymentClient {
     class PaymentFallback implements PaymentClient {
 
         @Override
-        public ResponseEntity<PaymentResponseDto> processPayment(PaymentRequestDto paymentRequest) {
+        public ResponseEntity<PaymentResponseDto> createCheckoutSession(PaymentRequestDto paymentRequest) {
             log.error("Fallback: Payment service unavailable for booking id: {}", paymentRequest.getBookingId());
              // Return a FAILED status immediately or throw custom exception
              PaymentResponseDto fallbackResponse = PaymentResponseDto.builder()

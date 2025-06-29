@@ -10,5 +10,11 @@ export const reserveSeats = (bookingData) =>
 export const confirmBooking = (data) =>
   axiosInstance.post(`${BASE_URL}/booking-service/api/v1/bookings`, data);
 
-export const getUserBookingHistory = (userId) =>
-  axiosInstance.get(`${BASE_URL}/booking-service/api/v1/my-bookings`);
+export const getUserBookingHistory = () =>
+  axiosInstance.get(`${BASE_URL}/booking-service/api/v1/bookings/my-bookings`);
+
+export const deinitializeSeatsForShowtime = (showtimeId) =>
+  axiosInstance.delete(`/admin/showtimes/${showtimeId}/deinitialize-seats`);
+
+export const cancelBooking = (bookingId) =>
+  axiosInstance.patch(`${BASE_URL}/booking-service/api/v1/bookings/${bookingId}/cancel`);

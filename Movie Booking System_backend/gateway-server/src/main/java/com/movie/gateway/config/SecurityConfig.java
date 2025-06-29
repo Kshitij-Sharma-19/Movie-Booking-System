@@ -28,7 +28,21 @@ public class SecurityConfig {
         	.cors(Customizer.withDefaults())
             .authorizeExchange(exchanges -> exchanges
                 // Allow access to Swagger UI and related resources without authentication
-                .pathMatchers("/swagger-ui/**", "/swagger-resources/**", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-config/**", "/api-docs/**").permitAll()
+            	.pathMatchers(
+            			    "/swagger-ui.html",
+            			    "/swagger-ui/**",
+            			    "/v3/api-docs/**",
+            			    "/webjars/**",
+            			    "/favicon.ico",
+            			    "/swagger-resources/**",
+            			    "/swagger-config/**",
+            			    "/api-docs/**",
+            			    "/auth-service/api-docs",
+            		        "/booking-service/api-docs",
+            		        "/movie-catalog-service/api-docs",
+            		        "/payment-service/api-docs",
+            		        "/user-service/api-docs"
+            			).permitAll()
                 // Allow access to actuator health endpoint
                 .pathMatchers("/actuator/health/**").permitAll()
                  // Allow access to the authentication service endpoints for login/registration/token refresh/jwks
@@ -39,6 +53,7 @@ public class SecurityConfig {
                 .pathMatchers(HttpMethod.GET, "/movie-catalog-service/api/v1/showtimes/search").permitAll()
                 .pathMatchers(HttpMethod.GET, "/movie-catalog-service/api/v1/showtimes/movie/**").permitAll()
                 .pathMatchers(HttpMethod.GET, "/movie-catalog-service/api/v1/showtimes/{id}").permitAll()
+                .pathMatchers(HttpMethod.POST, "/booking-service/api/email/send").permitAll()
                 // Use service ID prefix if discovery locator is used
                 // .pathMatchers("/api/v1/auth/**", "/oauth2/jwks").permitAll() // Or use path if explicit routes are defined without service ID prefix
                 // All other requests require authentication

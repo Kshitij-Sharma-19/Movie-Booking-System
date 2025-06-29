@@ -60,7 +60,7 @@ button {
   font-size: 1.1em;
   font-weight: 600;
   font-family: inherit;
-  background-color: #adc1e9;
+  background-color: #1976d2;
   color: #ffffff;
   cursor: pointer;
   transition: background-color 0.3s ease, transform 0.2s ease;
@@ -69,14 +69,9 @@ button {
 button:hover {
   background-color: #ffffff;
   transform: scale(1.05);
+  transition: cubic-bezier(0.19, 1, 0.22, 1);
 }
 
-
-button:focus,
-button:focus-visible {
-  outline: 3px dashed #04dfdf;
-  outline-offset: 4px;
-}
 
 
 @media (prefers-color-scheme: light) {
@@ -113,9 +108,8 @@ button:focus-visible {
 }
 
 .translucent-text-container {
-  background-color: rgba(242, 255, 0, 0.5);
+  background-color: #ffc400b3;
   padding: 1.2em;
-  border-radius: 12px;
   color: #000000;
   font-weight: 500;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
@@ -123,4 +117,21 @@ button:focus-visible {
   text-align: center;
   align-items: center;
   flex-direction: width;
+  display: flex;
+  justify-content: center;
+  font-weight: bolder;
+
 }
+
+input:-webkit-autofill,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #fff inset !important; /* White background */
+  box-shadow: 0 0 0 1000px #fff inset !important;
+  -webkit-text-fill-color: #000 !important; /* Black text */
+  color: #000 !important;
+  caret-color: #000 !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+

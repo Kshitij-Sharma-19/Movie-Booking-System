@@ -11,7 +11,7 @@ import io.swagger.v3.oas.annotations.info.Info;
 @SpringBootApplication
 @EnableDiscoveryClient // Register with Eureka
 @EnableFeignClients // Enable Feign clients for inter-service communication
-@OpenAPIDefinition(info = @Info(title = "Booking API", version = "1.0", description = "API for managing Movie Bookings"))
+@OpenAPIDefinition(info = @Info(title = "Booking Service API", version = "1.0", description = "API for managing Movie Bookings"))
 public class BookingServiceApplication {
 
 	public static void main(String[] args) {

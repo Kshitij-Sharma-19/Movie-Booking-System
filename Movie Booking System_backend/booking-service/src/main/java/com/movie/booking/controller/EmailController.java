@@ -25,6 +25,7 @@ public class EmailController {
                 pdfBytes = Base64.getDecoder().decode(request.getBase64Pdf());
             }
 
+            //Same service method acting for sending email for tickets and contact us query
             emailService.sendBookingConfirmation(
                 request.getToEmail(),
                 request.getSubject(),

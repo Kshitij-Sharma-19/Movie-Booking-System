@@ -10,18 +10,20 @@ import {
   DialogContent,
   TextField,
   DialogActions,
+  Box,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthContext } from "../../context/AuthContext";
-import { searchMovies } from "../../services/movieService";
-
+// import { searchMovies } from "../../services/movieService";
+import  logo from '../../assets/images/2.png';
+import SearchBar from "../movies/SearchBar";
 const Header = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useAuthContext();
 
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+ const [searchOpen, setSearchOpen] = useState(false);
+  const [results, setResults] = useState([]);
 
   const handleLogout = () => {
     logout();
@@ -55,63 +57,101 @@ const Header = () => {
 
   return (
     <>
-      <AppBar className="header"
-        position="static"
-        sx={{
-          backgroundColor: "#041562",
-          "& a:hover": {
-            color: "#FFD700",
-          },
-        }}
-      >
-        <Toolbar>
-          <Typography
-            variant="h6"
-            component={Link}
-            to="/"
-            sx={{ flexGrow: 1, color: "inherit", textDecoration: "none" }}
-          >
-            Movie Booking
-          </Typography>
-
-          <IconButton color="inherit" onClick={() => setSearchOpen(true)}>
-            <SearchIcon />
-          </IconButton>
-
-          <Button color="inherit" component={Link} to="/movies">
-            Movies
-          </Button>
-
-          {isAuthenticated ? (
-            <>
-              <Button color="inherit" onClick={() => navigate("/user/profile")} sx={{
+     <AppBar
+      className="header"
+      position="static"
+      sx={{
+        backgroundColor: "#041562",
+        "& a:hover": {
+          color: "#FFD700",
+        },
+      }}
+    >
+      <Toolbar>
+        {/* Logo on the left */}
+        <IconButton
+  edge="start"
+  color="inherit"
+  component={Link}
+  to="/"
+  sx={{
+    p: 0,
+    marginBottom: "0",
     "&:hover": {
-      color: "red",
+      backgroundColor: "transparent",
     },
-  }
-  }>{user.sub}</Button>
-              {user.roles === "ROLE_ADMIN" && (
-                <Button component={Link} to="/admin/dashboard" color="inherit">
-                  Admin
-                </Button>
-              )}
-              <Button color="inherit" sx={{
-    "&:hover": {
-      color: "red",
-    },
-  }} onClick={handleLogout}>
-                Logout
-              </Button>
-            </>
-          ) : (
-            <Button color="inherit" component={Link} to="/login">
-              Login
+     
+  }}
+>
+<Box
+ component="img"
+    src={logo}
+    alt="CineShowtime Logo"
+    sx={{
+      height: "50px",
+      width: "auto",
+      display: "flex",
+      alignItems: "center",
+      imageRendering: "auto",
+      "&:hover": {
+        transform: "scale(1.1)",
+        transition: "transform 0.3s ease",
+      },
+    }}
+  >
+  </Box>
+</IconButton>
+
+        {/* Spacer to push menu items to the right */}
+        <div style={{ flexGrow: 1 }} />
+
+        <IconButton color="inherit" onClick={() => setSearchOpen(true)}>
+          <SearchIcon />
+        </IconButton>
+
+        <Button color="inherit" component={Link} to="/movies">
+          Movies
+        </Button>
+
+        {isAuthenticated ? (
+          <>
+            <Button
+              color="inherit"
+              onClick={() => navigate("/user/profile")}
+              sx={{
+                "&:hover": {
+                  color: "red",
+                },
+              }}
+            >
+              {user.sub}
             </Button>
-          )}
-        </Toolbar>
-      </AppBar>
+            {user.roles === "ROLE_ADMIN" && (
+              <Button component={Link} to="/admin/dashboard" color="inherit">
+                Admin
+              </Button>
+            )}
+            <Button
+              color="inherit"
+              sx={{
+                "&:hover": {
+                  color: "red",
+                },
+              }}
+              onClick={handleLogout}
+            >
+              Logout
+            </Button>
+          </>
+        ) : (
+          <Button color="inherit" component={Link} to="/login">
+            Login
+          </Button>
+        )}
+      </Toolbar>
+    </AppBar>
 
-      {/* Search Modal */}
+      {/* Search Modal
       <Dialog open={searchOpen} onClose={() => setSearchOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Search Movies</DialogTitle>
         <DialogContent>
@@ -132,7 +172,15 @@ const Header = () => {
             Search
           </Button>
         </DialogActions>
-      </Dialog>
+      </Dialog> */}
+        {/* <IconButton color="inherit" onClick={() => setSearchOpen(true)}>
+        <SearchIcon />
+      </IconButton> */}
+      <SearchBar
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        onResults={setResults}
+      />
     </>
   );
 };

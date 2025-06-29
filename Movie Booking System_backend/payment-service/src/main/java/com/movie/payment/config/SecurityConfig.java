@@ -1,6 +1,6 @@
 package com.movie.payment.config;
 
-import javax.crypto.SecretKey;
+import javax.crypto.SecretKey;  
 import javax.crypto.spec.SecretKeySpec;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -31,7 +31,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import java.util.Date;
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true) // Needed for @PreAuthorize
@@ -51,7 +53,8 @@ public class SecurityConfig {
                                  "/swagger-resources/**",
                                  "/webjars/**",
                                  "/api-docs/**",
-                                 "/actuator/health").permitAll()
+                                 "/actuator/health",
+                                 "/api/v1/payments/webhook").permitAll()
                 .anyRequest().authenticated()
             )
             // Configure to use the custom JwtAuthenticationConverter
@@ -79,4 +82,5 @@ public class SecurityConfig {
         jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
         return jwtAuthenticationConverter;
     }
+   
 }
