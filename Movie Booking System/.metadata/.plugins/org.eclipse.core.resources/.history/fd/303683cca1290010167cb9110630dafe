@@ -1,5 +1,0 @@
-package com.movie.moviecatalogservice.exception;
-
-public class GlobalExceptionHandler {
-
-}

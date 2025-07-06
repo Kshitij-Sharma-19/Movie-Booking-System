@@ -1,5 +1,0 @@
-package com.movie.auth.service;
-
-public class JwtService {
-
-}

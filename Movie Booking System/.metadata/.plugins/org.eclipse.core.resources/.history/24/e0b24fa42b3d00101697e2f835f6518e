@@ -1,5 +1,0 @@
-package com.movie.moviecatalogservice.config;
-
-public class UserFeignClientInterceptor {
-
-}
