@@ -25,7 +25,7 @@ import {
 import { Movie, AccessTime, Person, CalendarToday, Star, Movie as MovieIcon } from "@mui/icons-material";
 import { formatReleaseDate } from "../utils/dateUtils.js";
 
-const OMDB_API_KEY = "YOUR_OMDB_API_KEY";
+const OMDB_API_KEY = "YOUR_OMDB_KEY";
 
 const fetchOmdbData = async (title, year) => {
   const url = `https://www.omdbapi.com/?t=${encodeURIComponent(title)}${year ? `&y=${year}` : ""}&apikey=${OMDB_API_KEY}`;

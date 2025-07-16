@@ -17,7 +17,7 @@ export const getUserBookingHistory = () =>
   axiosInstance.get(`${BASE_URL}/booking-service/api/v1/bookings/my-bookings`);
 
 export const deinitializeSeatsForShowtime = (showtimeId) =>
-  axiosInstance.delete(`/admin/showtimes/${showtimeId}/deinitialize-seats`);
+  axiosInstance.delete(`${BASE_URL}/booking-service/api/v1/admin/showtimes/${showtimeId}/deinitialize-seats`);
 
 export const cancelBooking = (bookingId) =>
   axiosInstance.patch(`${BASE_URL}/booking-service/api/v1/bookings/${bookingId}/cancel`);

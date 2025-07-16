@@ -15,7 +15,8 @@ const MovieCard = ({ movie }) => {
       <CardContent>
         <Typography variant="h6" noWrap>{movie.title} </Typography>
         <Typography variant="body2" color="text.secondary">
-          {movie.genre} | ⭐ {movie.rating}
+          {movie.genre} 
+          {/* | 💟 {movie.rating} */}
         </Typography>
         <Box mt={1}>
           <Button variant="outlined" size="small" component={Link} to={`/movies/${movie.id}`}>

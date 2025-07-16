@@ -80,10 +80,10 @@ const Movies = () => {
   return (
     <Box>
       {/* Header + Filters */}
-      <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
+      <Box display="flex" alignItems="center" justifyContent="space-between" mb={3} backgroundColor="white" padding={2} borderRadius={2} boxShadow={1}>
         <Typography variant="h4">Browse Movies</Typography>
 
-        <Box display="flex" gap={2}>
+        <Box display="flex" gap={2} >
           {/* Genre Filter */}
           <FormControl sx={{ minWidth: 150 }} size="small">
             <InputLabel>Genre</InputLabel>
@@ -123,7 +123,7 @@ const Movies = () => {
       </Box>
 
       {/* Movie Grid */}
-      <Grid container spacing={3} margin={4}  className="center">
+      <Grid container spacing={3} margin={4}  className="center" >
         {currentMovies.map((movie) => (
           <Grid item key={movie.id} xs={12} sm={6} md={4}>
             <MovieCard movie={movie} />
@@ -133,7 +133,7 @@ const Movies = () => {
 
       {/* Pagination */}
       {pageCount > 1 && (
-        <Box display="flex" justifyContent="center" mt={4}>
+        <Box display="flex" justifyContent="center" mt={4} backgroundColor="white" padding={2} borderRadius={2} boxShadow={1} width={"100%"}>
           <Pagination
             count={pageCount}
             page={currentPage}

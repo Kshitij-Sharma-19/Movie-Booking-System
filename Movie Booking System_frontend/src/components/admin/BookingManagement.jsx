@@ -13,7 +13,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { deinitializeSeatsForShowtime } from "../../services/bookingService";
 import axiosInstance from "../../services/axiosInstance";
 import { green, grey } from "@mui/material/colors";
-
+import { useNotify } from "../../context/NotificationContext";
 const BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 const BookingManagement = () => {
@@ -22,7 +22,7 @@ const BookingManagement = () => {
   const [seatsPerRow, setSeatsPerRow] = useState("");
   const [success, setSuccess] = useState(null);
   const [error, setError] = useState(null);
-
+  const {notifySuccess, notifyError } = useNotify();
   // For deinitialize
   const [deinitShowtimeId, setDeinitShowtimeId] = useState("");
   const [deinitSuccess, setDeinitSuccess] = useState(null);
@@ -33,6 +33,7 @@ const BookingManagement = () => {
     setError(null);
     if (!showtimeId || !totalSeats || !seatsPerRow) {
       setError("All fields are required.");
+      notifyError("All fields are required.")
       return;
     }
     try {
@@ -44,6 +45,7 @@ const BookingManagement = () => {
         }
       );
       setSuccess("Seats initialized successfully!");
+      notifySuccess("Seats initialized!")
       setShowtimeId("");
       setTotalSeats("");
       setSeatsPerRow("");
@@ -66,12 +68,14 @@ const BookingManagement = () => {
     try {
       await deinitializeSeatsForShowtime(deinitShowtimeId);
       setDeinitSuccess("Seats deinitialized successfully!");
+      notifySuccess("Seats deinitialized!")
       setDeinitShowtimeId("");
     } catch (err) {
       setDeinitError(
         err?.response?.data?.message ||
           "Failed to deinitialize seats. Please check the showtime ID."
       );
+      notifyError("Failed to deinitialize seats. ");
     }
   };
 

@@ -13,6 +13,7 @@ import {
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { getAllMovies, createMovie, updateMovie, deleteMovie } from "../../services/movieService";
+import { useNotify } from "../../context/NotificationContext";
 
 const defaultMovie = {
   id: "",
@@ -46,7 +47,7 @@ const MovieManagement = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [newMovie, setNewMovie] = useState({ ...defaultMovie });
   const [editMovie, setEditMovie] = useState({ ...defaultMovie });
-
+  const {notifySuccess, notifyError } = useNotify();
   const fetchMovies = () => {
     getAllMovies().then((res) => {
       const movies = res.data.map(normalizeMovie);
@@ -146,8 +147,9 @@ const MovieManagement = () => {
       await createMovie(payload);
       handleClose();
       fetchMovies();
+      notifySuccess("Movie "+newMovie.title+" created");
     } catch (err) {
-      alert("Failed to create movie");
+      notifyError("Failed to create movie");
     }
   };
 
@@ -158,8 +160,9 @@ const MovieManagement = () => {
       await updateMovie(editMovie.id, payload);
       handleEditClose();
       fetchMovies();
+      notifySuccess("Movie "+ editMovie.title+" updated!");
     } catch (err) {
-      alert("Failed to update movie");
+      notifyError("Failed to update the movie");
     }
   };
 
@@ -169,8 +172,9 @@ const MovieManagement = () => {
       try {
         await deleteMovie(id);
         fetchMovies();
+        notifySuccess("Movie deleted");
       } catch (err) {
-        alert("Failed to delete movie");
+        notifyError("Failed to delete movie");
       }
     }
   };
